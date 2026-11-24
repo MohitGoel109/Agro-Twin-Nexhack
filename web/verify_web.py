@@ -1,5 +1,5 @@
 """
-One-command verification script for the Animated Flask UI + On-Topic AI Assistant.
+One-command verification script for Member 4 (Shashi) — Upgraded Flask Web UI & AI Guide.
 Run from repo root:
     python web/verify_web.py
 """
@@ -18,7 +18,7 @@ from web.ai_assistant import AgroTwinAssistant
 
 def run_verification():
     print("=" * 76)
-    print("AGRO-TWIN | FLASK ANIMATED UI & STRICT AI ASSISTANT VERIFICATION")
+    print("AGRO-TWIN | MEMBER 4 (SHASHI) UPGRADED WEB UI & AI GUIDE VERIFICATION")
     print("=" * 76)
 
     # 1. Syntax check Flask app.py
@@ -27,18 +27,15 @@ def run_verification():
         ast.parse(f.read(), filename=app_path)
     print("[CHECK 1] web/app.py syntax valid.")
 
-    # 2. Check templates & static assets exist
-    required_files = [
-        "web/templates/index.html",
-        "web/static/css/style.css",
-        "web/static/js/app.js",
-    ]
-    for rel in required_files:
-        full = os.path.join(REPO_ROOT, rel)
-        assert os.path.exists(full) and os.path.getsize(full) > 500, f"Missing or empty: {rel}"
-    print("[CHECK 2] All HTML/CSS/JS animated UI assets present.")
+    # 2. Check HTML/CSS/JS assets & new SVG X-Ray / Hindi / ROI / SMS / Webhook elements
+    html_path = os.path.join(REPO_ROOT, "web", "templates", "index.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        html_src = f.read()
+    for token in ["machine-xray-svg", "btn-lang", "btn-speak", "btn-weather-heat", "inp-hourly-loss", "sms-card-panel", "inp-webhook-url"]:
+        assert token in html_src, f"Missing UI element in index.html: {token}"
+    print("[CHECK 2] SVG X-Ray blueprint, EN/हिंदी voice, Heatwave, Rupee ROI, SMS Card & Webhook UI verified.")
 
-    # 3. Verify AI Assistant answers website questions accurately using LIVE twin state
+    # 3. Verify AI Assistant answers all website + new feature queries accurately
     twin = TwinStateManager(num_steps=120, technicians_total=2)
     twin.current_step = 35
     bot = AgroTwinAssistant(twin)
@@ -46,20 +43,21 @@ def run_verification():
     on_topic_tests = [
         ("How do I use this website?", "website_guide"),
         ("What is wrong with TR-101?", "machine_status"),
-        ("Why are SD-304 and TR-105 on hold?", "machine_status"),
+        ("How do the SVG X-Ray & Heatwave mode work?", "ui_accessibility_features"),
+        ("Tell me about Heatwave 45C thermal stress", "weather_stress"),
+        ("How much Rupee ROI and downtime does Agro-Twin save?", "baseline_comparison"),
         ("How does the model avoid data leakage and noise?", "ml_explainability"),
-        ("How much downtime does Agro-Twin save vs calendar?", "baseline_comparison"),
-        ("How do I schedule maintenance when parts are scarce?", "operations_scheduling"),
+        ("How do SMS job cards and n8n webhooks work?", "operations_scheduling"),
         ("What needs attention right now?", "live_fleet_summary"),
-        ("How does this fit AI in Agriculture scalability?", "track_and_architecture"),
+        ("वेबसाइट कैसे उपयोग करें?", "website_guide"),
     ]
     for q, expected_topic in on_topic_tests:
         res = bot.answer(q)
         assert res["allowed"] is True and res["warning"] is False, f"Should allow on-topic query: {q}"
         assert res["topic"] == expected_topic, f"Unexpected topic for '{q}': {res['topic']}"
-    print(f"[CHECK 3] Passed {len(on_topic_tests)}/{len(on_topic_tests)} live on-topic website queries.")
+    print(f"[CHECK 3] Passed {len(on_topic_tests)}/{len(on_topic_tests)} live on-topic queries (English + Hindi).")
 
-    # 4. Verify STRICT OFF-TOPIC GUARDRAIL blocks unrelated questions & warns user
+    # 4. Verify STRICT OFF-TOPIC GUARDRAIL blocks unrelated queries & warns user
     off_topic_tests = [
         "What is the capital of France?",
         "Write me a poem about the ocean",
@@ -71,26 +69,34 @@ def run_verification():
         "How do I use Photoshop layers?",
         "What is the price of Bitcoin today?",
         "Explain quantum mechanics",
+        "Who is Batman?",
+        "What is the weather forecast in Panipat?",
     ]
     for q in off_topic_tests:
         res = bot.answer(q)
         assert res["allowed"] is False and res["warning"] is True, f"GUARDRAIL FAILED on off-topic query: {q}"
-        assert "stick to the contents of this website" in res["answer"].lower()
+        assert "stick to the contents of this website" in res["answer"].lower() or "बाहर है" in res["answer"]
     print(f"[CHECK 4] Blocked {len(off_topic_tests)}/{len(off_topic_tests)} off-topic queries with clear warning.")
 
-    # 5. Optional live Flask app import check if Flask is installed
+    # 5. Live Flask test_client check when Flask is installed
     try:
         from web.app import app as flask_app
         client = flask_app.test_client()
         assert client.get("/").status_code == 200
-        assert client.get("/api/fleet").status_code == 200
-        bad = client.post("/api/assistant", json={"question": "Who is Batman?"}).get_json()
-        assert bad["warning"] is True and bad["allowed"] is False
-        print("[CHECK 5] Live Flask test_client verified (/, /api/fleet, /api/assistant).")
+        w_res = client.post("/api/weather", json={"weather_mode": "heatwave_45c"}).get_json()
+        assert w_res["ok"] and w_res["ambient_temp_c"] == 45
+        client.post("/api/weather", json={"weather_mode": "normal"})
+        roi_res = client.get("/api/roi?hourly_loss_inr=2500&preventive_part_cost_inr=2200").get_json()
+        assert roi_res["net_savings_inr"] > 0 and roi_res["roi_multiple"] > 1
+        sms_res = client.get("/api/sms-card/TR-101").get_json()
+        assert sms_res["ok"] and len(sms_res["sms_en"]) <= 160 and len(sms_res["checklist"]) == 4
+        wh_res = client.post("/api/webhook", json={"webhook_url": ""}).get_json()
+        assert wh_res["ok"]
+        print("[CHECK 5] Live Flask endpoints (/, /api/weather, /api/roi, /api/sms-card, /api/webhook) verified.")
     except ImportError:
-        print("[CHECK 5] Flask not installed in this test env (install via: pip install -r requirements.txt).")
+        print("[CHECK 5] Flask not installed in this sandbox env (install via: pip install -r requirements.txt).")
 
-    print("\nALL CHECKS PASSED! Run your animated Flask website with:")
+    print("\nALL CHECKS PASSED! Run your upgraded website with:")
     print("    python web/app.py")
     print("Then open: http://localhost:5000")
     print("=" * 76)

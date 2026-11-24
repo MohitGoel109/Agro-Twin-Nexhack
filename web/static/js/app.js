@@ -1,13 +1,13 @@
-/* Agro-Twin Interactive Flask Frontend: Calm Canvas Motion, Segmented Views, Live Plotly & On-Topic AI Guide */
+/* Agro-Twin Interactive Flask Frontend: SVG X-Ray Blueprint, EN/हिंदी Voice, Weather Stress, Rupee ROI, SMS Cards & On-Topic AI Guide */
 
 const STATUS_META = {
-    HEALTHY: { label: "Healthy", color: "#4e7a5c", cls: "" },
-    SERVICED_READY: { label: "Serviced & ready", color: "#5b9a6f", cls: "saved" },
-    SERVICING: { label: "In service", color: "#6e8898", cls: "saved" },
-    DATA_CHECK: { label: "Data hold", color: "#6e8898", cls: "hold" },
-    EARLY_WARNING: { label: "Early warning", color: "#b87b28", cls: "urgent" },
-    CRITICAL_WARNING: { label: "Critical fault", color: "#d9534f", cls: "urgent" },
-    BROKEN_DOWN: { label: "Broken down", color: "#a83834", cls: "urgent" },
+    HEALTHY: { label: "Healthy", labelHi: "स्वस्थ", color: "#4e7a5c", cls: "" },
+    SERVICED_READY: { label: "Serviced & ready", labelHi: "सर्विस पूर्ण", color: "#5b9a6f", cls: "saved" },
+    SERVICING: { label: "In service", labelHi: "सर्विस जारी", color: "#6e8898", cls: "saved" },
+    DATA_CHECK: { label: "Data hold", labelHi: "डेटा जांच", color: "#6e8898", cls: "hold" },
+    EARLY_WARNING: { label: "Early warning", labelHi: "प्रारंभिक चेतावनी", color: "#b87b28", cls: "urgent" },
+    CRITICAL_WARNING: { label: "Critical fault", labelHi: "गंभीर खराबी", color: "#d9534f", cls: "urgent" },
+    BROKEN_DOWN: { label: "Broken down", labelHi: "मशीन बंद", color: "#a83834", cls: "urgent" },
 };
 
 const SENSOR_LABELS = {
@@ -16,10 +16,51 @@ const SENSOR_LABELS = {
     MISSING_DATA_HOLD: "Missing telemetry",
 };
 
+const I18N = {
+    en: {
+        trackTag: "AI in Agriculture",
+        navAll: "All Segments",
+        navFleet: "01 · Fleet",
+        navTel: "02 · X-Ray & Telemetry",
+        navImpact: "03 · Rupee ROI",
+        navOps: "04 · SMS & Ops",
+        askGuide: "Ask AI Guide",
+        eyebrow: "AI in Agriculture · Predictive Maintenance Digital Twin",
+        heroTitle: "Catch farm machinery faults before harvest stalls.",
+        heroSub:
+            "Built for shared rural tractor and harvester fleets. Agro-Twin replays ordinary machine sensors, separates isolated sensor spikes and dropouts from genuine wear, and prioritizes scarce mechanics and spare parts with plain-English and Hindi explainability.",
+        kpiHourLbl: "Harvest hour",
+        kpiReadyLbl: "Fleet readiness",
+        kpiPrevLbl: "Breakdowns prevented",
+        kpiWoLbl: "Open work orders",
+        kpiTechLbl: "Technicians free",
+    },
+    hi: {
+        trackTag: "कृषि में एआई",
+        navAll: "सभी भाग",
+        navFleet: "01 · बेड़ा स्थिति",
+        navTel: "02 · एक्स-रे और सेंसर",
+        navImpact: "03 · रुपये (₹) बचत",
+        navOps: "04 · SMS और कार्य",
+        askGuide: "AI गाइड से पूछें",
+        eyebrow: "कृषि में एआई · प्रेडिक्टिव मेंटेनेंस डिजिटल ट्विन",
+        heroTitle: "कटाई रुकने से पहले कृषि मशीनों की खराबी पहचानें।",
+        heroSub:
+            "साझा ट्रैक्टर और हार्वेस्टर बेड़े के लिए निर्मित। Agro-Twin सेंसर डेटा से असली घिसाव और झूठे अलार्म में अंतर करता है और मैकेनिक व स्पेयर पार्ट्स को प्राथमिकता देता है।",
+        kpiHourLbl: "कटाई घंटा",
+        kpiReadyLbl: "बेड़ा उपलब्धता",
+        kpiPrevLbl: "रोके गए ब्रेकडाउन",
+        kpiWoLbl: "खुले वर्क ऑर्डर",
+        kpiTechLbl: "उपलब्ध मैकेनिक",
+    },
+};
+
 const STATE = {
     step: 35,
     calendarInterval: 72,
     selectedTelemetryUnit: "TR-101",
+    weatherMode: "normal",
+    lang: "en",
     fleet: null,
     health: null,
     bgMotionEnabled: true,
@@ -47,7 +88,6 @@ function initAmbientCanvas() {
     function drawFrame() {
         ctx.clearRect(0, 0, width, height);
 
-        // Ultra-subtle warm charcoal dot grid
         ctx.fillStyle = "rgba(243, 239, 230, 0.035)";
         const gap = 46;
         for (let x = 24; x < width; x += gap) {
@@ -56,7 +96,6 @@ function initAmbientCanvas() {
             }
         }
 
-        // Slow drifting agricultural contour lines (very low opacity — never flashy)
         const lineCount = 6;
         for (let i = 0; i < lineCount; i++) {
             ctx.beginPath();
@@ -97,16 +136,58 @@ function initAmbientCanvas() {
     }
 }
 
-/* ---------------- 2. Gentle Scroll Reveal & Segment Switcher ---------------- */
+/* ---------------- 2. Bilingual EN / हिंदी Toggle & Browser Voice Readout ---------------- */
+function applyLanguage() {
+    const dict = I18N[STATE.lang] || I18N.en;
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const key = el.dataset.i18n;
+        if (dict[key]) el.textContent = dict[key];
+    });
+    const langBtn = document.getElementById("btn-lang");
+    if (langBtn) {
+        langBtn.textContent = STATE.lang === "en" ? "EN / हिंदी" : "हिंदी / EN";
+    }
+    if (STATE.fleet) {
+        renderFleetCards(STATE.fleet);
+    }
+}
+
+function speakPriorityAlert() {
+    if (!("speechSynthesis" in window)) {
+        showToast("Browser speech synthesis is not supported in this browser.", "warning");
+        return;
+    }
+    window.speechSynthesis.cancel();
+    const fleet = STATE.fleet;
+    if (!fleet) return;
+
+    const top = fleet.priority_queue && fleet.priority_queue.length ? fleet.priority_queue[0] : null;
+    let speechText = "";
+    if (STATE.lang === "hi") {
+        speechText = top
+            ? `चेतावनी। ${top.machine_id} में ${Math.round(top.fault_probability * 100)} प्रतिशत खराबी का जोखिम है। कृपया 4 घंटे की अग्रिम सर्विस बुक करें और ${top.part_needed} तैयार रखें।`
+            : `घंटा ${fleet.step} पर सभी कृषि मशीनें सामान्य रूप से कार्य कर रही हैं।`;
+    } else {
+        speechText = top
+            ? `Agro-Twin Alert. Unit ${top.machine_id}, ${top.name}, has ${Math.round(top.fault_probability * 100)} percent fault risk. Schedule a 4-hour preventive service using ${top.part_needed}.`
+            : `Agro-Twin status at Hour ${fleet.step}. All six agricultural units are operating normally.`;
+    }
+
+    const utter = new SpeechSynthesisUtterance(speechText);
+    utter.lang = STATE.lang === "hi" ? "hi-IN" : "en-IN";
+    utter.rate = 0.98;
+    window.speechSynthesis.speak(utter);
+    showToast(STATE.lang === "hi" ? "हिंदी अलर्ट पढ़ा जा रहा है..." : "Speaking priority alert aloud...", "info");
+}
+
+/* ---------------- 3. Gentle Scroll Reveal & Segment Switcher ---------------- */
 function initRevealAndSegments() {
     const sections = document.querySelectorAll(".reveal");
     if ("IntersectionObserver" in window) {
         const obs = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add("visible");
-                    }
+                    if (entry.isIntersecting) entry.target.classList.add("visible");
                 });
             },
             { threshold: 0.06 }
@@ -116,7 +197,6 @@ function initRevealAndSegments() {
         sections.forEach((s) => s.classList.add("visible"));
     }
 
-    // Topbar segment filter (view All Segments or isolate one cleanly)
     const navButtons = document.querySelectorAll(".nav-link");
     const toggleableSegs = ["seg-fleet", "seg-telemetry", "seg-compare", "seg-ops"];
 
@@ -144,7 +224,6 @@ function initRevealAndSegments() {
                 window.scrollTo({ top: 0, behavior: "smooth" });
             }
 
-            // Resize Plotly charts cleanly when revealed
             setTimeout(() => {
                 if (window.Plotly) {
                     ["chart-risk", "chart-telemetry", "chart-compare-avail", "chart-compare-bar"].forEach((cid) => {
@@ -157,7 +236,7 @@ function initRevealAndSegments() {
     });
 }
 
-/* ---------------- 3. Toast Helper & Fetch Wrapper ---------------- */
+/* ---------------- 4. Toast Helper & Fetch Wrapper ---------------- */
 let toastTimer = null;
 function showToast(msg, kind = "info") {
     const el = document.getElementById("toast-banner");
@@ -176,11 +255,13 @@ async function apiJson(url, options = {}) {
     return await resp.json();
 }
 
-/* ---------------- 4. Render KPIs, Fleet Cards, Priority Queue & Work Orders ---------------- */
+/* ---------------- 5. Render KPIs, Fleet Cards, Priority Queue & Work Orders ---------------- */
 function unitHeadline(m, currentStep) {
     const st = m.status;
     if (st === "SERVICED_READY") {
-        return "4-hour preventive repair completed early — 18-hour harvest breakdown prevented.";
+        return STATE.lang === "hi"
+            ? "4 घंटे की अग्रिम मरम्मत पूर्ण — 18 घंटे का ब्रेकडाउन रोका गया।"
+            : "4-hour preventive repair completed early — 18-hour harvest breakdown prevented.";
     }
     if (st === "SERVICING") return m.recommended_action;
     if (st === "BROKEN_DOWN") {
@@ -208,6 +289,14 @@ function unitHeadline(m, currentStep) {
 
 function renderLedger(fleet) {
     document.getElementById("kpi-hour").textContent = `Hr ${fleet.step}`;
+    const wMode = fleet.weather_mode || STATE.weatherMode;
+    STATE.weatherMode = wMode;
+    document.getElementById("kpi-weather-note").textContent =
+        wMode === "heatwave_45c" ? "Heatwave 45°C thermal stress" : "Normal 30°C field weather";
+
+    document.getElementById("btn-weather-normal").classList.toggle("active-weather", wMode !== "heatwave_45c");
+    document.getElementById("btn-weather-heat").classList.toggle("active-weather", wMode === "heatwave_45c");
+
     document.getElementById("kpi-readiness").textContent = `${fleet.fleet_readiness_pct}%`;
     document.getElementById("kpi-active").textContent = `${fleet.machines_available} of ${fleet.machines_total} units active`;
     document.getElementById("kpi-prevented").textContent = `${fleet.breakdowns_prevented}`;
@@ -220,7 +309,6 @@ function renderLedger(fleet) {
     document.getElementById("step-slider").value = fleet.step;
     document.getElementById("slider-readout").textContent = `Hr ${fleet.step}`;
 
-    // Sync scarcity form inputs with live inventory
     document.getElementById("inp-techs").value = fleet.resources.technicians_total;
     document.getElementById("inp-cp").value = fleet.resources.parts_inventory["Coolant Pump"] ?? 0;
     document.getElementById("inp-hv").value = fleet.resources.parts_inventory["Hydraulic Valve"] ?? 0;
@@ -301,7 +389,8 @@ function renderFleetCards(fleet) {
     grid.innerHTML = "";
 
     fleet.machines.forEach((m, idx) => {
-        const meta = STATUS_META[m.status] || { label: m.status, color: "#524f47", cls: "" };
+        const meta = STATUS_META[m.status] || { label: m.status, labelHi: m.status, color: "#524f47", cls: "" };
+        const badgeText = STATE.lang === "hi" ? meta.labelHi : meta.label;
         const riskPct = Math.round(m.fault_probability * 100);
         const uncPct = Math.round(m.uncertainty * 100);
         const confPct = Math.round(m.confidence * 100);
@@ -314,9 +403,10 @@ function renderFleetCards(fleet) {
 
         let actionHtml = "";
         if (m.status === "CRITICAL_WARNING" || m.status === "EARLY_WARNING") {
+            const schedLabel = STATE.lang === "hi" ? `4h सर्विस बुक करें (${m.part_needed})` : `Schedule 4h service (${m.part_needed})`;
             actionHtml = `
                 <div class="unit-actions">
-                    <button class="btn btn-amber" data-schedule="${m.machine_id}">Schedule 4h service (${m.part_needed})</button>
+                    <button class="btn btn-amber" data-schedule="${m.machine_id}">${schedLabel}</button>
                     ${!m.acknowledged ? `<button class="btn btn-subtle" data-ack="${m.machine_id}">Acknowledge</button>` : ""}
                 </div>
             `;
@@ -334,7 +424,7 @@ function renderFleetCards(fleet) {
                     <span class="unit-id">${m.machine_id}</span>
                     <span class="unit-name">${m.name}</span>
                 </div>
-                <span class="status-tag" style="background:${meta.color};">${meta.label}</span>
+                <span class="status-tag" style="background:${meta.color};">${badgeText}</span>
             </div>
             <div class="unit-summary">${unitHeadline(m, fleet.step)}</div>
             <div class="risk-meter">
@@ -350,7 +440,6 @@ function renderFleetCards(fleet) {
         grid.appendChild(card);
     });
 
-    // Attach live action listeners
     grid.querySelectorAll("[data-schedule]").forEach((btn) => {
         btn.addEventListener("click", async () => {
             const id = btn.dataset.schedule;
@@ -360,6 +449,7 @@ function renderFleetCards(fleet) {
             });
             showToast(res.message || "Scheduled.", res.ok ? "success" : "warning");
             await refreshAll();
+            await refreshRoi();
         });
     });
 
@@ -405,7 +495,7 @@ function renderPriorityQueue(fleet) {
 function renderWorkOrdersAndLog(fleet) {
     const woBody = document.getElementById("wo-tbody");
     if (!fleet.work_orders.length) {
-        woBody.innerHTML = `<tr><td colspan="6" style="color:#787368;">No work orders yet. Schedule a 4-hour service on TR-101 in Segment 01 to track its lifecycle here.</td></tr>`;
+        woBody.innerHTML = `<tr><td colspan="7" style="color:#787368;">No work orders yet. Schedule a 4-hour service on TR-101 in Segment 01 to generate an SMS Job Card.</td></tr>`;
     } else {
         woBody.innerHTML = fleet.work_orders
             .map(
@@ -419,10 +509,15 @@ function renderWorkOrdersAndLog(fleet) {
                         w.scheduled_start !== null ? `Hr ${w.scheduled_start}–${w.completion_step}` : "Deferred"
                     }</td>
                     <td style="color:#a8a296;">${w.reason}</td>
+                    <td><button class="btn btn-subtle" data-sms-unit="${w.machine_id}">View SMS Card</button></td>
                 </tr>
             `
             )
             .join("");
+
+        woBody.querySelectorAll("[data-sms-unit]").forEach((btn) => {
+            btn.addEventListener("click", () => openSmsJobCard(btn.dataset.smsUnit));
+        });
     }
 
     const logBox = document.getElementById("event-log-list");
@@ -441,7 +536,74 @@ function renderWorkOrdersAndLog(fleet) {
     }
 }
 
-/* ---------------- 5. Telemetry & Explainability Segment ---------------- */
+async function openSmsJobCard(machineId) {
+    const res = await apiJson(`/api/sms-card/${machineId}?step=${STATE.step}`);
+    if (!res.ok) {
+        showToast(res.message || "Could not load SMS card.", "warning");
+        return;
+    }
+    const panel = document.getElementById("sms-card-panel");
+    panel.classList.remove("hidden");
+    document.getElementById("sms-card-title").textContent = `${res.wo_id} · ${res.machine_id} — ${res.part_needed}`;
+    document.getElementById("sms-en-text").textContent = res.sms_en;
+    document.getElementById("sms-hi-text").textContent = res.sms_hi;
+    document.getElementById("sms-checklist").innerHTML = (res.checklist || [])
+        .map((step) => `<li>${step}</li>`)
+        .join("");
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/* ---------------- 6. Interactive SVG X-Ray Blueprint & Telemetry ---------------- */
+function updateXrayBlueprint(machine, focusPart = null) {
+    const parts = ["Coolant Pump", "Sensor Harness", "Hydraulic Valve", "Drive Bearing"];
+    const targetPart = focusPart || machine.part_needed;
+
+    document.getElementById("xray-unit-title").textContent = `${machine.machine_id} — ${machine.name}`;
+    document.getElementById("xray-focus-note").textContent = `Target subsystem: ${targetPart}`;
+
+    parts.forEach((pName) => {
+        const box = document.getElementById(`part-box-${pName}`);
+        if (!box) return;
+        const isTarget = pName === targetPart;
+        if (isTarget) {
+            if (machine.status === "CRITICAL_WARNING" || machine.status === "EARLY_WARNING" || machine.status === "BROKEN_DOWN") {
+                box.setAttribute("fill", "rgba(229, 154, 50, 0.24)");
+                box.setAttribute("stroke", "#e59a32");
+                box.setAttribute("stroke-width", "2.4");
+            } else if (machine.status === "DATA_CHECK") {
+                box.setAttribute("fill", "rgba(110, 136, 152, 0.24)");
+                box.setAttribute("stroke", "#6e8898");
+                box.setAttribute("stroke-width", "2.2");
+            } else if (machine.status === "SERVICED_READY" || machine.status === "SERVICING") {
+                box.setAttribute("fill", "rgba(91, 154, 111, 0.22)");
+                box.setAttribute("stroke", "#5b9a6f");
+                box.setAttribute("stroke-width", "2.2");
+            } else {
+                box.setAttribute("fill", "#2a2822");
+                box.setAttribute("stroke", "#a8a296");
+                box.setAttribute("stroke-width", "2");
+            }
+        } else {
+            box.setAttribute("fill", "#1d1c18");
+            box.setAttribute("stroke", "#444139");
+            box.setAttribute("stroke-width", "1.4");
+        }
+    });
+
+    const partSensorNotes = {
+        "Coolant Pump": "Monitors Engine Temp (baseline 82°C). Rising temp + falling oil pressure flags cooling loop degradation.",
+        "Hydraulic Valve": "Monitors Oil Pressure (baseline 45 PSI). Pressure drop + vibration flags valve spool leakage.",
+        "Drive Bearing": "Monitors Vibration (2.0 mm/s) & RPM Variance (15 RPM). Rising vibration flags bearing wear.",
+        "Sensor Harness": "Monitors CAN telemetry integrity. Single-hour spikes and dropouts are held to avoid false dispatches.",
+    };
+
+    document.getElementById("xray-insp-body").innerHTML = `
+        <div><strong>Selected subsystem:</strong> ${targetPart}</div>
+        <div style="margin-top:4px;"><strong>Mapped unit part:</strong> ${machine.part_needed} (${machine.part_in_stock} in stock)</div>
+        <div style="margin-top:6px;">${partSensorNotes[targetPart] || ""}</div>
+    `;
+}
+
 async function refreshTelemetry() {
     const unitId = STATE.selectedTelemetryUnit;
     const detail = await apiJson(`/api/machines/${unitId}/history?up_to_step=${STATE.step}`);
@@ -449,6 +611,8 @@ async function refreshTelemetry() {
 
     const m = detail.machine;
     const meta = STATUS_META[m.status] || { label: m.status };
+
+    updateXrayBlueprint(m);
 
     document.getElementById("telemetry-explain-box").innerHTML = `
         <div><strong>Unit:</strong> ${m.machine_id} — ${m.name}</div>
@@ -508,7 +672,23 @@ async function refreshTelemetry() {
     Plotly.react(el, traces, layout, { displayModeBar: false, responsive: true });
 }
 
-/* ---------------- 6. Fair Baseline Comparison Segment ---------------- */
+/* ---------------- 7. Fair Baseline Comparison & Rupee (₹) ROI ---------------- */
+function formatInr(val) {
+    return "₹" + Math.round(Number(val || 0)).toLocaleString("en-IN");
+}
+
+async function refreshRoi() {
+    const loss = Number(document.getElementById("inp-hourly-loss").value || 2500);
+    const partCost = Number(document.getElementById("inp-part-cost").value || 2200);
+    const roi = await apiJson(
+        `/api/roi?hourly_loss_inr=${loss}&preventive_part_cost_inr=${partCost}&calendar_interval=${STATE.calendarInterval}`
+    );
+    document.getElementById("roi-gross").textContent = formatInr(roi.gross_harvest_protected_inr);
+    document.getElementById("roi-spend").textContent = formatInr(roi.preventive_spend_inr);
+    document.getElementById("roi-net").textContent = formatInr(roi.net_savings_inr);
+    document.getElementById("roi-mult").textContent = `${roi.roi_multiple}x ROI`;
+}
+
 async function refreshComparison() {
     const comp = await apiJson(`/api/compare?calendar_interval=${STATE.calendarInterval}`);
     const cal = comp.calendar_only;
@@ -523,6 +703,8 @@ async function refreshComparison() {
     document.getElementById("cmp-breakdowns-note").textContent = `${imp.breakdowns_avoided} avoided (vs. ${cal.unplanned_breakdowns} calendar)`;
     document.getElementById("cmp-lead").textContent = `${ai.avg_warning_lead_time_hours} hrs`;
     document.getElementById("cmp-holds").textContent = `${ai.noisy_or_missing_alerts_held} noisy/missing alerts held`;
+
+    await refreshRoi();
 
     if (!window.Plotly) return;
 
@@ -604,7 +786,7 @@ async function refreshComparison() {
     );
 }
 
-/* ---------------- 7. Populate Dropdowns & Refresh Master State ---------------- */
+/* ---------------- 8. Dropdowns, Refresh & Controls ---------------- */
 let dropdownsInitialized = false;
 function syncMachineSelects(machines) {
     if (dropdownsInitialized) return;
@@ -646,8 +828,14 @@ async function refreshAll() {
     await refreshTelemetry();
 }
 
-/* ---------------- 8. Wire Timeline, Scarcity & Fault Injection Controls ---------------- */
 function initControls() {
+    document.getElementById("btn-lang").addEventListener("click", () => {
+        STATE.lang = STATE.lang === "en" ? "hi" : "en";
+        applyLanguage();
+    });
+
+    document.getElementById("btn-speak").addEventListener("click", speakPriorityAlert);
+
     const slider = document.getElementById("step-slider");
     slider.addEventListener("input", () => {
         document.getElementById("slider-readout").textContent = `Hr ${slider.value}`;
@@ -674,9 +862,33 @@ function initControls() {
         });
     });
 
+    document.getElementById("btn-weather-normal").addEventListener("click", async () => {
+        const res = await apiJson("/api/weather", {
+            method: "POST",
+            body: JSON.stringify({ weather_mode: "normal" }),
+        });
+        STATE.weatherMode = "normal";
+        showToast(res.stress_note || "Switched to Normal 30°C weather.", "info");
+        await refreshAll();
+        await refreshComparison();
+    });
+
+    document.getElementById("btn-weather-heat").addEventListener("click", async () => {
+        const res = await apiJson("/api/weather", {
+            method: "POST",
+            body: JSON.stringify({ weather_mode: "heatwave_45c" }),
+        });
+        STATE.weatherMode = "heatwave_45c";
+        showToast(res.stress_note || "Switched to Heatwave 45°C thermal stress.", "warning");
+        await refreshAll();
+        await refreshComparison();
+    });
+
     document.getElementById("btn-reset").addEventListener("click", async () => {
         const res = await apiJson("/api/reset", { method: "POST" });
         STATE.step = 35;
+        STATE.weatherMode = "normal";
+        document.getElementById("sms-card-panel").classList.add("hidden");
         showToast(res.message || "Reset cleanly.", "success");
         await refreshAll();
         await refreshComparison();
@@ -687,6 +899,18 @@ function initControls() {
         await refreshTelemetry();
     });
 
+    // Clickable SVG X-Ray Blueprint Subsystems
+    document.querySelectorAll(".xray-part").forEach((node) => {
+        node.addEventListener("click", () => {
+            if (!STATE.fleet) return;
+            const m = STATE.fleet.machines.find((item) => item.machine_id === STATE.selectedTelemetryUnit);
+            if (m) {
+                updateXrayBlueprint(m, node.dataset.part);
+                document.getElementById("chart-telemetry").scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+        });
+    });
+
     const calSlider = document.getElementById("cal-interval-slider");
     calSlider.addEventListener("input", () => {
         document.getElementById("cal-interval-readout").textContent = `${calSlider.value} hrs`;
@@ -695,6 +919,8 @@ function initControls() {
         STATE.calendarInterval = Number(calSlider.value);
         await refreshComparison();
     });
+
+    document.getElementById("btn-calc-roi").addEventListener("click", refreshRoi);
 
     document.getElementById("btn-apply-constraints").addEventListener("click", async () => {
         const payload = {
@@ -727,6 +953,19 @@ function initControls() {
         showToast(res.message || "Fault injected.", res.ok ? "warning" : "info");
         await refreshAll();
         await refreshComparison();
+    });
+
+    document.getElementById("btn-save-webhook").addEventListener("click", async () => {
+        const url = document.getElementById("inp-webhook-url").value.trim();
+        const res = await apiJson("/api/webhook", {
+            method: "POST",
+            body: JSON.stringify({ webhook_url: url }),
+        });
+        showToast(res.message || "Webhook saved.", "success");
+    });
+
+    document.getElementById("btn-close-sms").addEventListener("click", () => {
+        document.getElementById("sms-card-panel").classList.add("hidden");
     });
 }
 
@@ -775,7 +1014,7 @@ async function sendAiQuestion(question) {
     try {
         const res = await apiJson("/api/assistant", {
             method: "POST",
-            body: JSON.stringify({ question: trimmed }),
+            body: JSON.stringify({ question: trimmed, lang: STATE.lang }),
         });
         appendAiMessage(res.answer, "bot", Boolean(res.warning));
         if (res.suggested_questions) {
@@ -824,9 +1063,8 @@ function initAssistantDrawer() {
         await sendAiQuestion(q);
     });
 
-    // Welcome onboarding message explaining how to use the site & guardrail
     appendAiMessage(
-        "Hello! I am the **Agro-Twin Website Guide**. I can explain how to use any segment of this website, check live machine health, or explain our AI & baseline results. Note: I strictly answer questions about this website only — off-topic questions are blocked.",
+        "Hello! I am the **Agro-Twin Website Guide**. Ask me how to use any segment, inspect the SVG X-Ray blueprint, test Heatwave 45°C mode, or check Rupee ROI & live fleet health. Note: I strictly answer questions about this website only — off-topic questions are blocked.",
         "bot",
         false
     );

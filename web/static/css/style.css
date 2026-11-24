@@ -977,3 +977,206 @@ input[type="number"]:focus {
         border-bottom: 1px solid var(--border-subtle);
     }
 }
+
+
+/* Active Weather Toggle */
+.btn.active-weather {
+    border-color: var(--accent-amber);
+    color: var(--accent-amber);
+    background: rgba(229, 154, 50, 0.1);
+}
+
+/* Interactive SVG Machine X-Ray Blueprint */
+.xray-panel {
+    background: #161513;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+}
+
+.xray-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.xray-kicker {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-amber);
+    margin-bottom: 2px;
+}
+
+.xray-title {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.xray-grid {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: 16px;
+    align-items: center;
+}
+
+.xray-svg {
+    width: 100%;
+    height: auto;
+    max-height: 230px;
+    background: #131311;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+}
+
+.xray-part {
+    cursor: pointer;
+    transition: opacity 0.18s ease;
+}
+
+.xray-part:hover {
+    opacity: 0.9;
+}
+
+.xray-inspector {
+    background: #131311;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    min-height: 150px;
+}
+
+.xray-insp-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-amber);
+    margin-bottom: 8px;
+}
+
+.xray-insp-body {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Rupee (₹) ROI Card */
+.roi-card {
+    background: #161513;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+}
+
+.roi-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.roi-inputs {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.roi-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.roi-box {
+    background: #131311;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+}
+
+.roi-box.highlight {
+    border-color: #6b4c1e;
+}
+
+/* Webhook & Inline SMS Job Card */
+.webhook-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.text-input {
+    flex: 1;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    outline: none;
+}
+
+.text-input:focus {
+    border-color: var(--accent-amber);
+}
+
+.sms-card {
+    margin-top: 14px;
+    background: #161513;
+    border: 1px solid #6b4c1e;
+    border-left: 3px solid var(--accent-amber);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+    animation: card-fade 0.25s ease;
+}
+
+.sms-card.hidden {
+    display: none;
+}
+
+.sms-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sms-box {
+    background: #131311;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+}
+
+.sms-mono {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    margin-top: 4px;
+    word-break: break-word;
+}
+
+.sms-steps {
+    margin-top: 6px;
+    padding-left: 18px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+@media (max-width: 980px) {
+    .xray-grid,
+    .roi-metrics {
+        grid-template-columns: 1fr;
+    }
+}
