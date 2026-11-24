@@ -81,6 +81,10 @@ OFF_TOPIC_PATTERNS = [
 
 PURE_GREETINGS = {"hi", "hello", "hey", "hii", "hola", "namaste", "नमस्ते", "good morning", "good evening", "good afternoon"}
 HELP_PHRASES = {"help", "start", "guide", "how to use", "how do i use", "what can you do", "instructions", "what should i do"}
+TEAM_ATTRIBUTION_PATTERNS = (
+    r"^who (?:made|built|created|developed) (?:you|this(?: website| app| project)?|agro[\s-]?twin)$",
+    r"^who (?:is|are) behind (?:you|this(?: website| app| project)?|agro[\s-]?twin)$",
+)
 
 MACHINE_ALIASES = {
     "TR-101": ["tr-101", "tr101", "101", "alpha"],
@@ -129,6 +133,9 @@ class AgroTwinAssistant:
 
         if clean_punct in PURE_GREETINGS:
             return True, "greeting"
+
+        if any(re.fullmatch(pattern, clean_punct) for pattern in TEAM_ATTRIBUTION_PATTERNS):
+            return True, "team_attribution"
 
         if clean_punct in HELP_PHRASES or any(p in lower for p in ["how to use", "how do i use", "walk me through", "guide me", "कैसे उपयोग"]):
             non_site_tools = ["photoshop", "excel", "blender", "instagram", "whatsapp", "chatgpt", "minecraft", "iphone", "android"]
@@ -207,6 +214,30 @@ class AgroTwinAssistant:
                 "warning": True,
                 "topic": "out_of_scope",
                 "answer": OUT_OF_SCOPE_WARNING_HI if is_hindi else OUT_OF_SCOPE_WARNING_EN,
+                "suggested_questions": DEFAULT_SUGGESTIONS,
+            }
+
+        if reason == "team_attribution":
+            answer = (
+                "I’m the Agro-Twin website guide, created by **Deadline Dominators**. The four team members are:\n"
+                "• **Vansh** — AI & Explainability Lead (`ml/`)\n"
+                "• **Kunal** — Fleet Operations & Optimization Lead (`ops/`)\n"
+                "• **Mohit** — Backend & Twin State Architect (`backend/`)\n"
+                "• **Shashi** — Dashboard UI & Pitch Lead (`frontend/` and `web/`)."
+            )
+            if is_hindi:
+                answer = (
+                    "मैं Agro-Twin वेबसाइट गाइड हूँ, जिसे **Deadline Dominators** ने बनाया है। टीम के चार सदस्य हैं:\n"
+                    "• **Vansh** — AI और Explainability Lead (`ml/`)\n"
+                    "• **Kunal** — Fleet Operations और Optimization Lead (`ops/`)\n"
+                    "• **Mohit** — Backend और Twin State Architect (`backend/`)\n"
+                    "• **Shashi** — Dashboard UI और Pitch Lead (`frontend/` और `web/`)."
+                )
+            return {
+                "allowed": True,
+                "warning": False,
+                "topic": "track_and_architecture",
+                "answer": answer,
                 "suggested_questions": DEFAULT_SUGGESTIONS,
             }
 
@@ -442,7 +473,7 @@ class AgroTwinAssistant:
                 "answer": (
                     "**Agro-Twin — AI in Agriculture Track & 4-Member Architecture:**\n"
                     "• **Practical Rural Fit:** Protects shared tractor/harvester cooperatives during short harvest windows using existing sensors, Hindi voice/SMS alerts, and Rupee ROI clarity.\n"
-                    "• **4-Member Modular Stack:** **Vansh (`ml/`)** leak-free ML & 45°C heatwave engine, **Kunal (`ops/`)** constrained scheduler, Rupee ROI & SMS job cards, **Mohit (`backend/`)** unified twin state, FastAPI & n8n webhooks, and **Shashi (`web/`)** segmented Flask UI, SVG X-Ray blueprint & on-topic AI guide."
+                    "• **Team — Deadline Dominators:** **Vansh** (AI & Explainability Lead, `ml/`), **Kunal** (Fleet Operations & Optimization Lead, `ops/`), **Mohit** (Backend & Twin State Architect, `backend/`), and **Shashi** (Dashboard UI & Pitch Lead, `frontend/` and `web/`)."
                 ),
                 "suggested_questions": [
                     "How do I use this website?",

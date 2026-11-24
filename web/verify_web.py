@@ -76,12 +76,21 @@ def run_verification():
         ("How do SMS job cards and n8n webhooks work?", "operations_scheduling"),
         ("What needs attention right now?", "live_fleet_summary"),
         ("वेबसाइट कैसे उपयोग करें?", "website_guide"),
+        ("Who made you?", "track_and_architecture"),
+        ("Who built this website?", "track_and_architecture"),
     ]
     for q, expected_topic in on_topic_tests:
         res = bot.answer(q)
         assert res["allowed"] is True and res["warning"] is False, f"Should allow on-topic query: {q}"
         assert res["topic"] == expected_topic, f"Unexpected topic for '{q}': {res['topic']}"
     print(f"[CHECK 3] Passed {len(on_topic_tests)}/{len(on_topic_tests)} live on-topic queries (English + Hindi).")
+
+    team_answer = bot.answer("Who made you?")["answer"]
+    for member in ("Deadline Dominators", "Vansh", "Kunal", "Mohit", "Shashi"):
+        assert member in team_answer, f"Team attribution response is missing {member}."
+    for role in ("AI & Explainability Lead", "Fleet Operations & Optimization Lead", "Backend & Twin State Architect", "Dashboard UI & Pitch Lead"):
+        assert role in team_answer, f"Team attribution response is missing role: {role}."
+    print("[CHECK 3b] Team attribution identifies Deadline Dominators and all four member roles.")
 
     with patch.object(
         twin,
@@ -130,6 +139,7 @@ def run_verification():
         "Explain quantum mechanics",
         "Who is Batman?",
         "What is the weather forecast in Panipat?",
+        "Who made you write a poem?",
     ]
     for q in off_topic_tests:
         res = bot.answer(q)
