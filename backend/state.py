@@ -9,6 +9,8 @@ maintenance scheduler (ops/) into a single stateful simulation controller.
 
 from typing import Dict, Optional
 
+import requests
+
 from ml.ml_engine import FleetTelemetryEngine
 from ops.scheduler import FleetOperationsScheduler
 
@@ -27,6 +29,8 @@ class TwinStateManager:
             technicians_total=technicians_total,
         )
         self.current_step = 0
+        self.webhook_url = ""
+        self.webhook_log = []
 
     def _clamp_step(self, step: Optional[int]) -> int:
         if step is None:
@@ -102,6 +106,11 @@ class TwinStateManager:
         use_step = self._clamp_step(step)
         self.current_step = use_step
         res = self.scheduler.schedule_maintenance(machine_id, current_step=use_step)
+        if res.get("ok"):
+            self._emit_webhook(
+                "maintenance_scheduled",
+                {"machine_id": machine_id, "result": res},
+            )
         return {
             **res,
             "fleet_state": self.scheduler.get_operational_fleet_state(use_step),
@@ -123,6 +132,14 @@ class TwinStateManager:
         if not ok:
             return {"ok": False, "message": f"Unknown machine_id: {machine_id}"}
 
+        self._emit_webhook(
+            "fault_injected",
+            {
+                "machine_id": machine_id,
+                "start_step": use_step,
+                "fault_type": fault_type,
+            },
+        )
         return {
             "ok": True,
             "message": f"Injected '{fault_type}' into {machine_id} starting at Hour {use_step}.",
@@ -131,6 +148,89 @@ class TwinStateManager:
             "fault_type": fault_type,
             "fleet_state": self.scheduler.get_operational_fleet_state(self.current_step),
         }
+
+    def set_webhook_url(self, url: str) -> dict:
+        """Sets the optional HTTP webhook destination; an empty URL simulates locally."""
+        self.webhook_url = str(url).strip()
+        return {
+            "ok": True,
+            "webhook_url": self.webhook_url,
+            "target": self.webhook_url or "SIMULATED_LOCAL",
+        }
+
+    def get_webhook_log(self) -> list:
+        """Returns a copy of webhook delivery outcomes recorded during this session."""
+        return [dict(entry) for entry in self.webhook_log]
+
+    def _emit_webhook(self, event_type: str, payload: dict) -> dict:
+        """Attempts webhook delivery and records the outcome without disrupting operations."""
+        target = self.webhook_url or "SIMULATED_LOCAL"
+        delivered = False
+        status = "simulated locally"
+
+        if self.webhook_url.startswith(("http://", "https://")):
+            try:
+                response = requests.post(
+                    self.webhook_url,
+                    json={
+                        "event": event_type,
+                        "step": self.current_step,
+                        "payload": payload,
+                    },
+                    timeout=2.0,
+                )
+                response.raise_for_status()
+                delivered = True
+                status = f"HTTP {response.status_code}"
+            except requests.RequestException as exc:
+                status = str(exc)
+        elif self.webhook_url:
+            status = "webhook URL must start with http:// or https://"
+
+        entry = {
+            "step": self.current_step,
+            "event_type": event_type,
+            "target": target,
+            "delivered": delivered,
+            "status": status,
+        }
+        self.webhook_log.append(entry)
+        return dict(entry)
+
+    def set_weather_mode(self, mode: str) -> dict:
+        """Sets ML weather mode when supported and returns the resulting fleet state."""
+        if hasattr(self.ml_engine, "set_weather_mode"):
+            result = self.ml_engine.set_weather_mode(mode)
+        else:
+            result = {"ok": False, "message": "Weather mode is unavailable."}
+        return {
+            **result,
+            "fleet_state": self.scheduler.get_operational_fleet_state(self.current_step),
+        }
+
+    def get_roi_summary(
+        self,
+        hourly_loss_inr: float = 2500.0,
+        preventive_part_cost_inr: float = 2200.0,
+        calendar_interval: int = 72,
+    ) -> dict:
+        """Returns scheduler ROI metrics when the scheduler supports the calculation."""
+        if not hasattr(self.scheduler, "compute_roi_summary"):
+            return {"ok": False, "message": "ROI summary is unavailable."}
+        return self.scheduler.compute_roi_summary(
+            hourly_loss_inr=hourly_loss_inr,
+            preventive_part_cost_inr=preventive_part_cost_inr,
+            calendar_interval=calendar_interval,
+        )
+
+    def get_sms_job_card(self, machine_id: str, step: Optional[int] = None) -> dict:
+        """Returns a scheduler-generated SMS job card when supported."""
+        if not hasattr(self.scheduler, "generate_sms_job_card"):
+            return {"ok": False, "message": "SMS job cards are unavailable."}
+        return self.scheduler.generate_sms_job_card(
+            machine_id,
+            current_step=self._clamp_step(step),
+        )
 
     def update_constraints(
         self,

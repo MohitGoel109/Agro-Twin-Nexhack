@@ -43,6 +43,11 @@ def run_verification():
             "/work-orders",
             "/compare",
             "/reset",
+            "/weather",
+            "/roi",
+            "/sms-card/{machine_id}",
+            "/webhook",
+            "/webhook/log",
         }
         missing = required - set(route_paths)
         assert not missing, f"Missing FastAPI routes: {missing}"
@@ -94,6 +99,22 @@ def run_verification():
         f"[CHECK 8] Reset & Fair Comparison OK | AI Twin saves {comp['improvement']['downtime_hours_saved']}h "
         f"downtime (+{comp['improvement']['availability_gain_pct']}% availability)."
     )
+
+    weather = twin.set_weather_mode("heatwave_45c")
+    assert weather["ok"] and weather["fleet_state"]["step"] == twin.current_step
+    roi = twin.get_roi_summary()
+    assert "net_savings_inr" in roi and "roi_multiple" in roi
+    card = twin.get_sms_job_card("TR-101", step=35)
+    assert card["ok"] and card["machine_id"] == "TR-101"
+    webhook = twin.set_webhook_url("")
+    assert webhook["ok"] and webhook["target"] == "SIMULATED_LOCAL"
+    sched = twin.schedule_maintenance("TR-101", step=35)
+    assert sched["ok"]
+    webhook_log = twin.get_webhook_log()
+    assert webhook_log and webhook_log[-1]["event_type"] == "maintenance_scheduled"
+    assert webhook_log[-1]["target"] == "SIMULATED_LOCAL"
+    assert webhook_log[-1]["delivered"] is False
+    print("[CHECK 9] Weather, ROI, SMS job card, and local webhook logging OK.")
 
     print("\nALL CHECKS PASSED! Member 3 (Mohit) backend is 100% ready for Shashi's dashboard.")
     print("=" * 74)

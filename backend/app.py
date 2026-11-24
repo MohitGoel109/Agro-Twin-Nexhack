@@ -79,6 +79,14 @@ class ConstraintsRequest(BaseModel):
     parts_inventory: Optional[Dict[str, int]] = Field(default=None)
 
 
+class WeatherRequest(BaseModel):
+    mode: str = Field(..., examples=["heatwave_45c"])
+
+
+class WebhookRequest(BaseModel):
+    url: str = Field(default="", description="HTTP(S) webhook URL; empty disables delivery.")
+
+
 # ---------------- API Endpoints ----------------
 
 @app.get("/")
@@ -179,6 +187,47 @@ def compare_baseline(
 def reset_simulation():
     """Resets fleet telemetry, work orders, parts inventory, and clock back to Hour 0."""
     return twin.reset()
+
+
+@app.post("/weather")
+def set_weather_mode(req: WeatherRequest):
+    """Changes the fleet weather scenario and returns the updated state."""
+    return twin.set_weather_mode(mode=req.mode)
+
+
+@app.get("/roi")
+def get_roi_summary(
+    hourly_loss_inr: float = Query(default=2500.0, ge=0),
+    preventive_part_cost_inr: float = Query(default=2200.0, ge=0),
+    calendar_interval: int = Query(default=72, ge=12, le=120),
+):
+    """Returns estimated harvest protection and preventive-maintenance ROI."""
+    return twin.get_roi_summary(
+        hourly_loss_inr=hourly_loss_inr,
+        preventive_part_cost_inr=preventive_part_cost_inr,
+        calendar_interval=calendar_interval,
+    )
+
+
+@app.get("/sms-card/{machine_id}")
+def get_sms_job_card(
+    machine_id: str,
+    step: Optional[int] = Query(default=None, ge=0, le=119),
+):
+    """Returns a bilingual mechanic dispatch SMS card for a machine."""
+    return twin.get_sms_job_card(machine_id=machine_id, step=step)
+
+
+@app.post("/webhook")
+def configure_webhook(req: WebhookRequest):
+    """Configures or disables the n8n-compatible event webhook."""
+    return twin.set_webhook_url(req.url)
+
+
+@app.get("/webhook/log")
+def get_webhook_log():
+    """Returns recorded webhook delivery attempts."""
+    return twin.get_webhook_log()
 
 
 if __name__ == "__main__":
