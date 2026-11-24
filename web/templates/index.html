@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agro-Twin — Predictive Maintenance Twin for Agriculture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap"
+        rel="stylesheet"
+    />
+    <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+    <!-- Subtle, calm topographic field contour canvas background (never flashy) -->
+    <canvas id="ambient-bg" aria-hidden="true"></canvas>
+
+    <!-- Sticky Segment Navigation Bar -->
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand-group">
+                <span class="live-indicator" title="Live Flask Twin Engine"></span>
+                <span class="brand-name">Agro-Twin</span>
+                <span class="brand-tag">AI in Agriculture</span>
+            </div>
+
+            <nav class="seg-nav" aria-label="Website Segments">
+                <button class="nav-link active" data-segment="all">All Segments</button>
+                <button class="nav-link" data-segment="seg-fleet">01 · Fleet</button>
+                <button class="nav-link" data-segment="seg-telemetry">02 · Telemetry</button>
+                <button class="nav-link" data-segment="seg-compare">03 · Impact</button>
+                <button class="nav-link" data-segment="seg-ops">04 · Operations</button>
+            </nav>
+
+            <div class="topbar-actions">
+                <button id="btn-toggle-bg" class="btn btn-ghost" title="Toggle calm background motion">Motion: On</button>
+                <button id="btn-open-ai" class="btn btn-amber">Ask AI Guide</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="page-shell">
+        <!-- Toast Banner -->
+        <div id="toast-banner" class="toast hidden" role="status"></div>
+
+        <!-- ============================================================
+             SEGMENT 00: OVERVIEW, TRACK CONTEXT & TIMELINE REPLAY
+        ============================================================ -->
+        <section id="seg-overview" class="segment reveal">
+            <div class="hero-row">
+                <div class="hero-copy">
+                    <div class="eyebrow">AI in Agriculture · Predictive Maintenance Digital Twin</div>
+                    <h1 class="hero-title">Catch farm machinery faults before harvest stalls.</h1>
+                    <p class="hero-sub">
+                        Built for shared rural tractor and harvester fleets. Agro-Twin replays ordinary machine sensors,
+                        separates isolated sensor spikes and dropouts from genuine wear, and prioritizes scarce mechanics
+                        and spare parts with plain-English explainability.
+                    </p>
+                </div>
+                <div class="track-pillars">
+                    <div class="pillar-item">
+                        <span class="pillar-num">01</span>
+                        <div>
+                            <div class="pillar-title">Affordability</div>
+                            <div class="pillar-desc">No custom IoT hardware; uses existing temp, vibration, oil &amp; RPM feeds.</div>
+                        </div>
+                    </div>
+                    <div class="pillar-item">
+                        <span class="pillar-num">02</span>
+                        <div>
+                            <div class="pillar-title">Explainability</div>
+                            <div class="pillar-desc">Uncertainty bands and human-readable sensor reasons for every alert.</div>
+                        </div>
+                    </div>
+                    <div class="pillar-item">
+                        <span class="pillar-num">03</span>
+                        <div>
+                            <div class="pillar-title">Scalability</div>
+                            <div class="pillar-desc">Modular Python engine built to scale from 6-unit co-ops to district fleets.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5-Cell Operational Ledger Strip -->
+            <div class="ledger-strip" aria-label="Fleet KPIs">
+                <div class="ledger-cell">
+                    <div class="ledger-label">Harvest hour</div>
+                    <div class="ledger-value" id="kpi-hour">Hr 35</div>
+                    <div class="ledger-note">of 119-hour window</div>
+                </div>
+                <div class="ledger-cell">
+                    <div class="ledger-label">Fleet readiness</div>
+                    <div class="ledger-value" id="kpi-readiness">100.0%</div>
+                    <div class="ledger-note" id="kpi-active">6 of 6 units active</div>
+                </div>
+                <div class="ledger-cell">
+                    <div class="ledger-label">Breakdowns prevented</div>
+                    <div class="ledger-value accent" id="kpi-prevented">0</div>
+                    <div class="ledger-note" id="kpi-downtime">0 hrs total downtime</div>
+                </div>
+                <div class="ledger-cell">
+                    <div class="ledger-label">Open work orders</div>
+                    <div class="ledger-value" id="kpi-workorders">0</div>
+                    <div class="ledger-note" id="kpi-flagged">1 unit flagged</div>
+                </div>
+                <div class="ledger-cell">
+                    <div class="ledger-label">Technicians free</div>
+                    <div class="ledger-value" id="kpi-techs">2 / 2</div>
+                    <div class="ledger-note" id="kpi-techs-busy">0 assigned to bay</div>
+                </div>
+            </div>
+
+            <!-- Timeline Replay Control Bar -->
+            <div class="timeline-bar">
+                <div class="timeline-left">
+                    <label for="step-slider" class="control-label">Harvest timeline replay</label>
+                    <div class="slider-wrap">
+                        <input id="step-slider" type="range" min="0" max="119" value="35" />
+                        <span id="slider-readout" class="mono-pill">Hr 35</span>
+                    </div>
+                </div>
+                <div class="timeline-buttons">
+                    <button class="btn btn-subtle" id="btn-prev-hr">-1 hr</button>
+                    <button class="btn btn-subtle" id="btn-next-hr">+1 hr</button>
+                    <span class="btn-divider"></span>
+                    <button class="btn btn-subtle" data-jump="35">Hr 35 · Alert</button>
+                    <button class="btn btn-subtle" data-jump="48">Hr 48 · Saved</button>
+                    <button class="btn btn-subtle" data-jump="55">Hr 55 · Multi</button>
+                    <button class="btn btn-subtle" data-jump="0">Hr 0 · Start</button>
+                    <button class="btn btn-outline-danger" id="btn-reset">Reset</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             SEGMENT 01: LIVE FLEET HEALTH & INTERVENTIONS
+        ============================================================ -->
+        <section id="seg-fleet" class="segment reveal">
+            <div class="segment-header">
+                <div>
+                    <div class="segment-kicker">Segment 01 · Live Fleet &amp; Interventions</div>
+                    <h2 class="segment-title">Fault risk, uncertainty bands, and unit dispatch</h2>
+                    <p class="segment-sub">
+                        Warm amber marks confirmed developing faults ready for preventive service; muted slate marks noisy spikes or missing telemetry safely held.
+                    </p>
+                </div>
+                <button class="btn btn-ghost btn-ask-seg" data-prompt="What needs attention right now?">
+                    Explain this segment
+                </button>
+            </div>
+
+            <div class="chart-card">
+                <div id="chart-risk" class="plot-box"></div>
+            </div>
+
+            <div id="fleet-cards-grid" class="unit-grid"></div>
+
+            <div class="sub-block">
+                <h3 class="sub-title">Constrained maintenance priority queue</h3>
+                <p class="sub-desc">Ranked by fault probability, ensemble confidence, harvest criticality, and spare-part availability.</p>
+                <div class="table-wrap">
+                    <table class="data-table" id="priority-table">
+                        <thead>
+                            <tr>
+                                <th>Unit</th>
+                                <th>Machine</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Risk</th>
+                                <th>Confidence</th>
+                                <th>Part &amp; Stock</th>
+                                <th>Recommended Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="priority-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             SEGMENT 02: SENSOR TELEMETRY & NOISE / LEAK-FREE PROOF
+        ============================================================ -->
+        <section id="seg-telemetry" class="segment reveal">
+            <div class="segment-header">
+                <div>
+                    <div class="segment-kicker">Segment 02 · Telemetry &amp; Explainability</div>
+                    <h2 class="segment-title">Sensor replay &amp; leak-free verification</h2>
+                    <p class="segment-sub">
+                        Inspect TR-101 (genuine wear before Hr 46), SD-304 (1-hour spike rejected at Hr 35), or TR-105 (missing sensor dropout raising uncertainty).
+                    </p>
+                </div>
+                <div class="inline-controls">
+                    <label for="telemetry-unit-select" class="control-label">Inspect unit</label>
+                    <select id="telemetry-unit-select" class="select-input"></select>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div id="chart-telemetry" class="plot-box plot-tall"></div>
+            </div>
+
+            <div class="two-col-info">
+                <div class="info-card">
+                    <h3 class="sub-title">Plain-English explainability readout</h3>
+                    <div id="telemetry-explain-box" class="info-body"></div>
+                </div>
+                <div class="info-card">
+                    <h3 class="sub-title">Leak-free ML guarantee (Member 1)</h3>
+                    <div id="model-rules-box" class="info-body"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             SEGMENT 03: FAIR BASELINE COMPARISON (CALENDAR VS AI TWIN)
+        ============================================================ -->
+        <section id="seg-compare" class="segment reveal">
+            <div class="segment-header">
+                <div>
+                    <div class="segment-kicker">Segment 03 · Measurable Agricultural Impact</div>
+                    <h2 class="segment-title">Calendar-only servicing vs. Agro-Twin replay</h2>
+                    <p class="segment-sub">
+                        Replays the exact same 120-hour harvest failure scenario under identical technician and spare-parts constraints.
+                    </p>
+                </div>
+                <div class="inline-controls">
+                    <label for="cal-interval-slider" class="control-label">Calendar interval</label>
+                    <input id="cal-interval-slider" type="range" min="24" max="96" step="12" value="72" />
+                    <span id="cal-interval-readout" class="mono-pill">72 hrs</span>
+                </div>
+            </div>
+
+            <div class="ledger-strip ledger-4">
+                <div class="ledger-cell">
+                    <div class="ledger-label">AI fleet availability</div>
+                    <div class="ledger-value accent" id="cmp-avail">--</div>
+                    <div class="ledger-note" id="cmp-avail-gain">--</div>
+                </div>
+                <div class="ledger-cell">
+                    <div class="ledger-label">Downtime saved</div>
+                    <div class="ledger-value" id="cmp-saved">--</div>
+                    <div class="ledger-note" id="cmp-downtime-split">--</div>
+                </div>
+                <div class="ledger-cell">
+                    <div class="ledger-label">Unplanned breakdowns</div>
+                    <div class="ledger-value" id="cmp-breakdowns">--</div>
+                    <div class="ledger-note" id="cmp-breakdowns-note">--</div>
+                </div>
+                <div class="ledger-cell">
+                    <div class="ledger-label">Avg. warning lead time</div>
+                    <div class="ledger-value" id="cmp-lead">--</div>
+                    <div class="ledger-note" id="cmp-holds">--</div>
+                </div>
+            </div>
+
+            <div class="two-col-charts">
+                <div class="chart-card">
+                    <div id="chart-compare-avail" class="plot-box"></div>
+                </div>
+                <div class="chart-card">
+                    <div id="chart-compare-bar" class="plot-box"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             SEGMENT 04: SCARCITY CONTROLS, FAULT INJECTION & WORK ORDERS
+        ============================================================ -->
+        <section id="seg-ops" class="segment reveal">
+            <div class="segment-header">
+                <div>
+                    <div class="segment-kicker">Segment 04 · Operations, Scarcity &amp; Audit Trail</div>
+                    <h2 class="segment-title">Resource limits, live fault tests, and work orders</h2>
+                    <p class="segment-sub">
+                        Test spare-part shortages (set stock to 0 to verify graceful deferral) or inject a fresh developing fault into any healthy unit live.
+                    </p>
+                </div>
+            </div>
+
+            <div class="two-col-info">
+                <!-- Resource Scarcity Panel -->
+                <div class="info-card">
+                    <h3 class="sub-title">Technician &amp; spare-parts constraints</h3>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="inp-techs">Technicians on shift</label>
+                            <input id="inp-techs" type="number" min="1" max="5" value="2" />
+                        </div>
+                        <div class="form-field">
+                            <label for="inp-cp">Coolant Pump stock</label>
+                            <input id="inp-cp" type="number" min="0" max="5" value="1" />
+                        </div>
+                        <div class="form-field">
+                            <label for="inp-hv">Hydraulic Valve stock</label>
+                            <input id="inp-hv" type="number" min="0" max="5" value="1" />
+                        </div>
+                        <div class="form-field">
+                            <label for="inp-db">Drive Bearing stock</label>
+                            <input id="inp-db" type="number" min="0" max="5" value="1" />
+                        </div>
+                    </div>
+                    <button id="btn-apply-constraints" class="btn btn-amber">Apply scarcity constraints</button>
+                </div>
+
+                <!-- Live Fault Injection Panel -->
+                <div class="info-card">
+                    <h3 class="sub-title">Live fault injection sandbox</h3>
+                    <p class="sub-desc">Inject wear into a healthy unit at the current hour, then step forward 10 hours to watch early detection.</p>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label for="inj-machine">Target unit</label>
+                            <select id="inj-machine" class="select-input"></select>
+                        </div>
+                        <div class="form-field">
+                            <label for="inj-type">Degradation mode</label>
+                            <select id="inj-type" class="select-input">
+                                <option value="fault_bearing">Drive bearing wear</option>
+                                <option value="fault_engine">Engine cooling fault</option>
+                                <option value="fault_hydraulic">Hydraulic pressure loss</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button id="btn-inject-fault" class="btn btn-subtle">Inject fault at current hour</button>
+                </div>
+            </div>
+
+            <div class="sub-block">
+                <h3 class="sub-title">Maintenance work orders</h3>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>WO ID</th>
+                                <th>Unit</th>
+                                <th>Part</th>
+                                <th>Status</th>
+                                <th>Window</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wo-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="sub-block">
+                <h3 class="sub-title">Chronological audit log</h3>
+                <div id="event-log-list" class="audit-list"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ============================================================
+         FLOATING ON-TOPIC AI ASSISTANT DRAWER
+    ============================================================ -->
+    <button id="ai-fab" class="ai-fab" aria-label="Open Agro-Twin AI Assistant">
+        <span class="ai-fab-dot"></span>
+        <span>Agro-Twin AI Guide</span>
+    </button>
+
+    <aside id="ai-drawer" class="ai-drawer closed" aria-label="Agro-Twin Website AI Assistant">
+        <div class="ai-drawer-header">
+            <div>
+                <div class="ai-drawer-title">Agro-Twin AI Guide</div>
+                <div class="ai-drawer-sub">Website-only assistant · Strict scope guardrail active</div>
+            </div>
+            <button id="btn-close-ai" class="btn-icon" aria-label="Close AI Assistant">&times;</button>
+        </div>
+
+        <div id="ai-messages" class="ai-messages"></div>
+
+        <div id="ai-chips" class="ai-chips">
+            <button class="chip" data-q="How do I use this website?">How to use site</button>
+            <button class="chip" data-q="What needs attention right now?">Fleet status now</button>
+            <button class="chip" data-q="Why are SD-304 and TR-105 on hold?">Noise vs. faults</button>
+            <button class="chip" data-q="How much downtime does Agro-Twin save?">Downtime saved</button>
+        </div>
+
+        <form id="ai-form" class="ai-form">
+            <input
+                id="ai-input"
+                type="text"
+                placeholder="Ask anything about this website..."
+                autocomplete="off"
+                required
+            />
+            <button type="submit" class="btn btn-amber">Send</button>
+        </form>
+    </aside>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</body>
+</html>
