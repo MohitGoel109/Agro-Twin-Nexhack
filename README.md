@@ -148,6 +148,8 @@ python web/app.py
 
 ## Public Deployment (Recommended: Render)
 
+**Live website:** [agro-twin-web.onrender.com](https://agro-twin-web.onrender.com)
+
 Render is the best fit for the Flask website because it runs as a conventional Python web service and keeps the in-memory simulation state available to visitors while the instance is running. The repository includes [`render.yaml`](./render.yaml) as a Render Blueprint:
 
 1. Push the repository to GitHub.
