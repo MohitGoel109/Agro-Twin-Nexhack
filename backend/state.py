@@ -1,0 +1,181 @@
+"""
+Agro-Twin: Unified Digital Twin State Manager
+Owner: Member 3 (Mohit) - Backend & Twin State Architect
+Problem Statement 08: Predictive Maintenance Twin for Farm Machinery
+
+Bridges Member 1's leak-free ML engine (ml/) and Member 2's constrained
+maintenance scheduler (ops/) into a single stateful simulation controller.
+"""
+
+from typing import Dict, Optional
+
+from ml.ml_engine import FleetTelemetryEngine
+from ops.scheduler import FleetOperationsScheduler
+
+
+class TwinStateManager:
+    """
+    Maintains the live replay clock (`current_step`) and coordinates all
+    telemetry, prediction, scheduling, fault-injection, and comparison calls.
+    """
+
+    def __init__(self, num_steps: int = 120, technicians_total: int = 2):
+        self.num_steps = int(num_steps)
+        self.ml_engine = FleetTelemetryEngine(num_steps=self.num_steps)
+        self.scheduler = FleetOperationsScheduler(
+            ml_engine=self.ml_engine,
+            technicians_total=technicians_total,
+        )
+        self.current_step = 0
+
+    def _clamp_step(self, step: Optional[int]) -> int:
+        if step is None:
+            return self.current_step
+        return max(0, min(int(step), self.num_steps - 1))
+
+    def get_health(self) -> dict:
+        """Returns service health, active replay hour, and leak-free ML metadata."""
+        return {
+            "status": "ok",
+            "service": "Agro-Twin Predictive Maintenance API",
+            "current_step": self.current_step,
+            "max_step": self.num_steps - 1,
+            "machine_ids": self.ml_engine.get_all_machine_ids(),
+            "model_info": self.ml_engine.get_model_info(),
+        }
+
+    def get_fleet_state(self, step: Optional[int] = None) -> dict:
+        """Returns unified operational fleet state; syncs clock if `step` is provided."""
+        if step is not None:
+            self.current_step = self._clamp_step(step)
+        return self.scheduler.get_operational_fleet_state(self.current_step)
+
+    def advance_step(self, delta: int = 1, target_step: Optional[int] = None) -> dict:
+        """Advances or jumps the simulation clock and returns the updated fleet state."""
+        if target_step is not None:
+            self.current_step = self._clamp_step(target_step)
+        else:
+            self.current_step = self._clamp_step(self.current_step + int(delta))
+        return self.scheduler.get_operational_fleet_state(self.current_step)
+
+    def get_machine_detail(self, machine_id: str, up_to_step: Optional[int] = None) -> dict:
+        """Returns live operational state + hourly sensor telemetry history for one machine."""
+        if machine_id not in self.ml_engine.get_all_machine_ids():
+            return {"ok": False, "error": f"Machine '{machine_id}' not found."}
+
+        step = self._clamp_step(up_to_step)
+        fleet = self.scheduler.get_operational_fleet_state(step)
+        machine_info = next(
+            (m for m in fleet["machines"] if m["machine_id"] == machine_id),
+            None,
+        )
+        history = self.ml_engine.get_machine_history(machine_id, up_to_step=step)
+        return {
+            "ok": True,
+            "machine_id": machine_id,
+            "step": step,
+            "machine": machine_info,
+            "history": history,
+        }
+
+    def acknowledge_alert(
+        self,
+        machine_id: str,
+        step: Optional[int] = None,
+        note: str = "Alert acknowledged by fleet manager",
+    ) -> dict:
+        """Acknowledges an active alert and returns updated fleet readiness."""
+        use_step = self._clamp_step(step)
+        self.current_step = use_step
+        res = self.scheduler.acknowledge_alert(machine_id, current_step=use_step, note=note)
+        return {
+            **res,
+            "fleet_state": self.scheduler.get_operational_fleet_state(use_step),
+        }
+
+    def schedule_maintenance(
+        self,
+        machine_id: str,
+        step: Optional[int] = None,
+    ) -> dict:
+        """Schedules constrained preventive maintenance and returns updated readiness."""
+        use_step = self._clamp_step(step)
+        self.current_step = use_step
+        res = self.scheduler.schedule_maintenance(machine_id, current_step=use_step)
+        return {
+            **res,
+            "fleet_state": self.scheduler.get_operational_fleet_state(use_step),
+        }
+
+    def inject_fault(
+        self,
+        machine_id: str,
+        start_step: Optional[int] = None,
+        fault_type: str = "fault_engine",
+    ) -> dict:
+        """Injects a developing fault into any machine for live judge testing."""
+        use_step = self._clamp_step(start_step)
+        ok = self.ml_engine.inject_fault(
+            machine_id=machine_id,
+            start_step=use_step,
+            fault_type=fault_type,
+        )
+        if not ok:
+            return {"ok": False, "message": f"Unknown machine_id: {machine_id}"}
+
+        return {
+            "ok": True,
+            "message": f"Injected '{fault_type}' into {machine_id} starting at Hour {use_step}.",
+            "machine_id": machine_id,
+            "start_step": use_step,
+            "fault_type": fault_type,
+            "fleet_state": self.scheduler.get_operational_fleet_state(self.current_step),
+        }
+
+    def update_constraints(
+        self,
+        technicians_total: Optional[int] = None,
+        parts_inventory: Optional[Dict[str, int]] = None,
+    ) -> dict:
+        """Updates technician count or spare-parts stock live to demonstrate scarcity."""
+        self.scheduler.update_constraints(
+            technicians_total=technicians_total,
+            parts_inventory=parts_inventory,
+        )
+        return {
+            "ok": True,
+            "message": "Operational constraints updated.",
+            "resources": self.scheduler.get_resource_status(self.current_step),
+            "fleet_state": self.scheduler.get_operational_fleet_state(self.current_step),
+        }
+
+    def get_work_orders(self, step: Optional[int] = None) -> dict:
+        """Returns all work orders with live status at `step`."""
+        use_step = self._clamp_step(step)
+        return {
+            "step": use_step,
+            "work_orders": self.scheduler.get_all_work_orders(use_step),
+        }
+
+    def get_baseline_comparison(
+        self,
+        up_to_step: Optional[int] = None,
+        calendar_interval: int = 72,
+    ) -> dict:
+        """Runs fair Calendar-Only vs. Agro-Twin AI replay comparison."""
+        use_step = None if up_to_step is None else self._clamp_step(up_to_step)
+        return self.scheduler.compare_against_calendar_baseline(
+            up_to_step=use_step,
+            calendar_interval=max(12, int(calendar_interval)),
+        )
+
+    def reset(self) -> dict:
+        """Resets telemetry, work orders, inventory, and replay clock to Hour 0."""
+        self.ml_engine.reset_fleet()
+        self.scheduler.reset_operations()
+        self.current_step = 0
+        return {
+            "ok": True,
+            "message": "Agro-Twin simulation reset to Hour 0.",
+            "fleet_state": self.scheduler.get_operational_fleet_state(0),
+        }
