@@ -3,6 +3,8 @@
 > **NexHack 2.0** (Geeta University, Panipat) | **Track:** AI in Agriculture — **Problem Statement 08**  
 > **Team:** Deadline Dominators (Vansh, Kunal, Mohit, Shashi)
 
+**Repository:** [MohitGoel109/Agro-Twin-Nexhack](https://github.com/MohitGoel109/Agro-Twin-Nexhack)
+
 **Agro-Twin** is an explainable, leak-free predictive maintenance digital twin for shared agricultural machinery fleets. During short sowing and harvesting windows, an unexpected tractor or harvester breakdown can stall multiple farms at once—while fixed calendar-based servicing wastes scarce technicians and spare parts on healthy equipment.
 
 Agro-Twin replays hourly farm machinery telemetry, separates real developing faults from noisy or missing sensor data, quantifies prediction uncertainty, prioritizes constrained maintenance under limited technicians and spare parts, and proves its impact against a fair calendar-only servicing baseline.
@@ -101,8 +103,8 @@ The Streamlit dashboard can use the FastAPI service or its offline fallback. The
 
 ### 1. Clone the Repository & Install Dependencies
 ```bash
-git clone <YOUR_REPOSITORY_URL>
-cd <YOUR_REPOSITORY_FOLDER>
+git clone https://github.com/MohitGoel109/Agro-Twin-Nexhack.git
+cd Agro-Twin-Nexhack
 pip install -r requirements.txt
 ```
 
