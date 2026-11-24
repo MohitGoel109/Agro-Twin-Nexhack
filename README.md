@@ -13,7 +13,8 @@ Agro-Twin replays hourly farm machinery telemetry, separates real developing fau
 
 | PS 08 Requirement | How Agro-Twin Solves It |
 |---|---|
-| **Reconstruct Machine Condition** | Simulates a 6-machine farm fleet (`TR-101`, `HV-202`, `TR-103`, `SD-304`, `TR-105`, `HV-206`) over a 120-hour harvest window, tracking live availability, downtime, sensor history, and open work orders—zero specialist hardware required. |
+| **Reconstruct Machine Condition** | Starts with a 6-machine farm fleet (`TR-101`, `HV-202`, `TR-103`, `SD-304`, `TR-105`, `HV-206`) and supports adding, editing, or removing units during a 120-hour harvest replay. |
+| **Live Fleet Management** | Creates deterministic telemetry for new machines, applies condition modes and harvest criticality, keeps fleet selectors and AI recognition in sync, and releases reserved resources when a unit is removed. |
 | **Leak-Free Fault Detection** | Trains a 50-tree Random Forest strictly on backward sliding windows (`[t-5 .. t]`) to predict failure within the next 24 hours. Future failure timestamps never enter prediction inputs. |
 | **Uncertainty & Data Quality** | Computes uncertainty from ensemble tree disagreement plus missing-sensor penalties. A 3-hour rolling median filter isolates single-hour sensor spikes (`SENSOR_NOISE_FILTERED` on `SD-304`) and holds alarms during dropouts (`MISSING_DATA_HOLD` on `TR-105`). |
 | **Plain-English Explainability** | Every alert lists the top-3 human-readable sensor deviations (e.g., Engine Temperature above baseline, Oil Pressure drop, Vibration trend) alongside risk score and confidence bounds. |
@@ -39,24 +40,21 @@ Measured directly by `ops/verify_ops.py` on identical fleet telemetry:
 ## System Architecture
 
 ```text
-+-------------------------------------------------------------------+
-|               frontend/  (Shashi — Streamlit + Plotly)            |
-|  4-Tab Command Center | Dual-Mode Client (REST + Offline Fallback)|
-+---------------------------------+---------------------------------+
-                                  | HTTP / JSON (FastAPI)
-+---------------------------------v---------------------------------+
-|                backend/  (Mohit — FastAPI + State)                |
-|   TwinStateManager | 11 REST Endpoints | Live Clock & Reset API   |
-+----------------+----------------------------------+---------------+
-                 |                                  |
-+----------------v----------------+  +--------------v---------------+
-|   ml/  (Vansh — AI Engine)      |  |  ops/  (Kunal — Scheduler)   |
-| - 120h Synthetic Fleet Replay   |  | - Priority Scoring Engine    |
-| - 3h Median Spike Noise Filter  |  | - Technician & Parts Limits  |
-| - Leak-Free Random Forest + Std |  | - Alert Ack & Work Orders    |
-| - Top-3 Plain-English Reasons   |  | - Calendar vs AI Comparator  |
-+---------------------------------+  +------------------------------+
++-----------------------------+       +-----------------------------+
+| frontend/ Streamlit + Plotly|--HTTP>| backend/ FastAPI            |
+| 5 pages | 5 themes          |       | REST API | TwinStateManager  |
++-----------------------------+       +--------------+--------------+
++-----------------------------+                      |
+| web/ Flask segmented site   |--direct state calls--+
+| Fleet Manager | AI Guide    |                      |
++-----------------------------+                      |
+                                          +----------v----------+
+                                          | ml/       | ops/    |
+                                          | AI engine | Scheduler|
+                                          +-----------+---------+
 ```
+
+The Streamlit dashboard can use the FastAPI service or its offline fallback. The Flask website calls the shared `TwinStateManager` in-process.
 
 ---
 
@@ -78,16 +76,23 @@ Measured directly by `ops/verify_ops.py` on identical fleet telemetry:
 ├── backend/                   # Member 3 (Mohit) — Backend & Twin State Architect
 │   ├── __init__.py
 │   ├── state.py               # Unified Digital Twin state controller
-│   ├── app.py                 # FastAPI server (11 endpoints + CORS + Swagger /docs)
+│   ├── app.py                 # FastAPI fleet CRUD, simulation, and operations APIs
 │   └── verify_backend.py      # Integration tests for backend/ + ops/ + ml/
-└── frontend/                  # Member 4 (Shashi) — Dashboard UI & Pitch Lead
-    ├── __init__.py
-    ├── api_client.py          # Dual-mode API client (FastAPI + offline-safe local fallback)
-    ├── charts.py              # Interactive Plotly visualizations
-    ├── dashboard.py           # Multi-page command center with five selectable themes
-    ├── dashboard_shared.py    # Shared state and presentation helpers
-    ├── app_pages/             # Fleet, telemetry, performance, work orders, operations
-    └── verify_frontend.py     # Full-stack end-to-end verification across all 4 modules
+├── frontend/                  # Streamlit/Plotly dashboard
+│   ├── __init__.py
+│   ├── api_client.py          # Dual-mode API client (FastAPI + offline-safe local fallback)
+│   ├── charts.py              # Interactive Plotly visualizations
+│   ├── dashboard.py           # Multi-page command center with five selectable themes
+│   ├── dashboard_shared.py    # Shared state and presentation helpers
+│   ├── app_pages/             # Fleet, telemetry, performance, work orders, operations
+│   └── verify_frontend.py     # Streamlit dashboard verification
+├── web/                       # Flask website, fleet manager, and AI guide
+│   ├── app.py                 # Flask routes and live fleet CRUD API
+│   ├── ai_assistant.py        # Live fleet-aware assistant with strict off-topic guardrail
+│   ├── templates/             # Segmented website
+│   ├── static/                # Website JavaScript and styling
+│   └── verify_web.py          # Flask UI/API and assistant verification
+└── render.yaml                # Render Blueprint for the public Flask website
 ```
 
 ---
@@ -112,6 +117,7 @@ You can also run each module's individual check:
 python ml/verify_ml.py
 python ops/verify_ops.py
 python backend/verify_backend.py
+python web/verify_web.py
 ```
 
 ### 3. Launch the Backend API (Terminal 1)
@@ -119,7 +125,7 @@ python backend/verify_backend.py
 uvicorn backend.app:app --reload --port 8000
 ```
 * Interactive Swagger API docs: **`http://localhost:8000/docs`**
-* **Render Deployment Start Command:**
+* Optional standalone FastAPI service start command:
   ```bash
   uvicorn backend.app:app --host 0.0.0.0 --port $PORT
   ```
@@ -130,6 +136,28 @@ streamlit run frontend/dashboard.py
 ```
 * Dashboard URL: **`http://localhost:8501`**
 * *Resilience Note:* If the FastAPI server is offline, `AgroTwinClient` automatically falls back to **Direct Twin Mode** so the live demo remains 100% functional without network errors.
+
+### 5. Launch the Flask Website (Optional)
+```bash
+python web/app.py
+```
+* Website URL: **`http://localhost:5000`**
+* Segment 04 includes the Fleet Manager for adding, editing, and deleting machines.
+
+---
+
+## Public Deployment (Recommended: Render)
+
+Render is the best fit for the Flask website because it runs as a conventional Python web service and keeps the in-memory simulation state available to visitors while the instance is running. The repository includes [`render.yaml`](./render.yaml) as a Render Blueprint:
+
+1. Push the repository to GitHub.
+2. In Render, choose **New → Blueprint**, connect the repository, and approve the `agro-twin-web` service.
+3. Wait for the build and deploy to finish. Render uses `gunicorn` and checks `/api/health`.
+4. Open the public `onrender.com` URL shown on the service page.
+
+The free Render plan may sleep when idle, and an instance restart or redeploy resets the demo's in-memory fleet, work orders, and webhook log. This is a shareable demo, not durable fleet storage. The public demo API has no authentication; avoid entering private data or configuring a secret webhook URL on a publicly shared instance.
+
+**Vercel is not recommended** for this single stateful Python app: its serverless execution model is a poor match for an in-memory Flask simulation. If the UI and API are later separated and simulation state moves to persistent storage, that deployment choice can be revisited.
 
 ---
 

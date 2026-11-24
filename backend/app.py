@@ -87,6 +87,23 @@ class WebhookRequest(BaseModel):
     url: str = Field(default="", description="HTTP(S) webhook URL; empty disables delivery.")
 
 
+class MachineCreateRequest(BaseModel):
+    machine_id: str = Field(..., examples=["TR-107"])
+    name: str = Field(..., min_length=1, max_length=80)
+    part_needed: str = Field(..., examples=["Coolant Pump"])
+    criticality: float = Field(default=1.0, ge=0.8, le=1.5)
+    fault_mode: str = Field(default="healthy")
+    fault_start: Optional[int] = Field(default=None, ge=0, le=119)
+
+
+class MachineUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    part_needed: Optional[str] = Field(default=None)
+    criticality: Optional[float] = Field(default=None, ge=0.8, le=1.5)
+    fault_mode: Optional[str] = Field(default=None)
+    fault_start: Optional[int] = Field(default=None, ge=0, le=119)
+
+
 # ---------------- API Endpoints ----------------
 
 @app.get("/")
@@ -119,6 +136,39 @@ def get_machine_history(
     res = twin.get_machine_detail(machine_id=machine_id, up_to_step=up_to_step)
     if not res.get("ok"):
         raise HTTPException(status_code=404, detail=res.get("error", "Machine not found"))
+    return res
+
+
+@app.post("/machines")
+def add_machine(req: MachineCreateRequest):
+    """Adds a machine to the active fleet and returns the updated state."""
+    res = twin.add_machine(**req.dict())
+    if not res.get("ok"):
+        message = res.get("message", "Machine could not be added.")
+        status_code = 409 if "already exists" in message.lower() else 400
+        raise HTTPException(status_code=status_code, detail=message)
+    return res
+
+
+@app.put("/machines/{machine_id}")
+def update_machine(machine_id: str, req: MachineUpdateRequest):
+    """Updates the supplied metadata for an existing fleet machine."""
+    res = twin.update_machine(machine_id, **req.dict(exclude_unset=True))
+    if not res.get("ok"):
+        message = res.get("message", "Machine could not be updated.")
+        status_code = 404 if "not found" in message.lower() else 400
+        raise HTTPException(status_code=status_code, detail=message)
+    return res
+
+
+@app.delete("/machines/{machine_id}")
+def delete_machine(machine_id: str):
+    """Removes a machine and releases its active work-order resources."""
+    res = twin.delete_machine(machine_id)
+    if not res.get("ok"):
+        message = res.get("message", "Machine could not be removed.")
+        status_code = 404 if "not found" in message.lower() else 400
+        raise HTTPException(status_code=status_code, detail=message)
     return res
 
 

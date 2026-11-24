@@ -31,9 +31,22 @@ def run_verification():
     html_path = os.path.join(REPO_ROOT, "web", "templates", "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
         html_src = f.read()
-    for token in ["machine-xray-svg", "btn-lang", "btn-speak", "btn-weather-heat", "inp-hourly-loss", "sms-card-panel", "inp-webhook-url"]:
+    for token in [
+        "machine-xray-svg",
+        "btn-lang",
+        "btn-speak",
+        "btn-weather-heat",
+        "inp-hourly-loss",
+        "sms-card-panel",
+        "inp-webhook-url",
+        "fleet-manager-mode",
+        "fleet-manager-unit-select",
+        "fleet-manager-criticality",
+        "btn-save-machine",
+        "btn-delete-machine",
+    ]:
         assert token in html_src, f"Missing UI element in index.html: {token}"
-    print("[CHECK 2] SVG X-Ray blueprint, EN/हिंदी voice, Heatwave, Rupee ROI, SMS Card & Webhook UI verified.")
+    print("[CHECK 2] SVG X-Ray, language/voice, weather/ROI/SMS/webhook, and fleet manager UI verified.")
 
     # 3. Verify AI Assistant answers all website + new feature queries accurately
     twin = TwinStateManager(num_steps=120, technicians_total=2)
@@ -57,6 +70,30 @@ def run_verification():
         assert res["topic"] == expected_topic, f"Unexpected topic for '{q}': {res['topic']}"
     print(f"[CHECK 3] Passed {len(on_topic_tests)}/{len(on_topic_tests)} live on-topic queries (English + Hindi).")
 
+    dynamic_twin = TwinStateManager(num_steps=120, technicians_total=2)
+    dynamic_bot = AgroTwinAssistant(dynamic_twin)
+    assert dynamic_bot._find_mentioned_machines("Tell me about TR-107") == []
+    added = dynamic_twin.add_machine(
+        "TR-107",
+        "Tractor Golf",
+        "Sensor Harness",
+        criticality=1.2,
+    )
+    assert added["ok"]
+    new_unit_answer = dynamic_bot.answer("What is wrong with TR-107?")
+    assert new_unit_answer["allowed"] and new_unit_answer["topic"] == "machine_status"
+    assert "TR-107" in new_unit_answer["answer"]
+    updated = dynamic_twin.update_machine("TR-107", name="Tractor Golf Updated")
+    assert updated["ok"]
+    updated_answer = dynamic_bot.answer("Tell me about TR-107")
+    assert "Tractor Golf Updated" in updated_answer["answer"]
+    manager_answer = dynamic_bot.answer("How do I add a machine?")
+    assert manager_answer["allowed"] and manager_answer["topic"] == "machine_management"
+    assert dynamic_twin.delete_machine("TR-107")["ok"]
+    removed_answer = dynamic_bot.answer("Tell me about TR-107")
+    assert removed_answer["allowed"] is False and removed_answer["warning"] is True
+    print("[CHECK 4] AI guide dynamically recognizes added/edited units and drops deleted IDs.")
+
     # 4. Verify STRICT OFF-TOPIC GUARDRAIL blocks unrelated queries & warns user
     off_topic_tests = [
         "What is the capital of France?",
@@ -76,7 +113,7 @@ def run_verification():
         res = bot.answer(q)
         assert res["allowed"] is False and res["warning"] is True, f"GUARDRAIL FAILED on off-topic query: {q}"
         assert "stick to the contents of this website" in res["answer"].lower() or "बाहर है" in res["answer"]
-    print(f"[CHECK 4] Blocked {len(off_topic_tests)}/{len(off_topic_tests)} off-topic queries with clear warning.")
+    print(f"[CHECK 5] Blocked {len(off_topic_tests)}/{len(off_topic_tests)} off-topic queries with clear warning.")
 
     # 5. Live Flask test_client check when Flask is installed
     try:
@@ -92,7 +129,34 @@ def run_verification():
         assert sms_res["ok"] and len(sms_res["sms_en"]) <= 160 and len(sms_res["checklist"]) == 4
         wh_res = client.post("/api/webhook", json={"webhook_url": ""}).get_json()
         assert wh_res["ok"]
-        print("[CHECK 5] Live Flask endpoints (/, /api/weather, /api/roi, /api/sms-card, /api/webhook) verified.")
+        created = client.post(
+            "/api/machines",
+            json={
+                "machine_id": "TR-107",
+                "name": "Tractor Golf",
+                "part_needed": "Coolant Pump",
+                "criticality": 1.1,
+                "fault_mode": "healthy",
+            },
+        ).get_json()
+        assert created["ok"] and created["fleet_state"]["machines_total"] == 7
+        updated = client.put(
+            "/api/machines/TR-107",
+            json={"name": "Tractor Golf Updated", "criticality": 1.3},
+        ).get_json()
+        assert updated["ok"]
+        scheduled = client.post(
+            "/api/schedule",
+            json={"machine_id": "TR-107", "step": 35},
+        ).get_json()
+        assert scheduled["ok"]
+        deleted = client.delete("/api/machines/TR-107").get_json()
+        assert deleted["ok"] and deleted["fleet_state"]["machines_total"] == 6
+        assert deleted["cancelled_work_orders"] == [scheduled["work_order"]["wo_id"]]
+        assert deleted["refunded_parts"] == {"Coolant Pump": 1}
+        client.post("/api/reset")
+        print("[CHECK 6] Flask CRUD endpoints dynamically add, edit, and remove machines with cleanup.")
+        print("[CHECK 7] Existing Flask weather, ROI, SMS, webhook, and home routes verified.")
     except ImportError:
         print("[CHECK 5] Flask not installed in this sandbox env (install via: pip install -r requirements.txt).")
 

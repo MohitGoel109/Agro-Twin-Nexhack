@@ -4,6 +4,10 @@ Owner: Member 1 (Vansh) - AI & Explainability Lead
 Problem Statement 08: Predictive Maintenance Twin for Farm Machinery
 """
 
+import math
+import re
+from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -82,6 +86,27 @@ DEFAULT_FLEET_META = [
         "seed": 606,
     },
 ]
+
+FAULT_MODE_TO_INTERNAL = {
+    "healthy": "healthy",
+    "fault_engine": "fault_engine",
+    "fault_hydraulic": "fault_hydraulic",
+    "fault_bearing": "fault_bearing",
+    "noise_spike": "noisy",
+    "noisy": "noisy",
+    "missing_data": "missing",
+    "missing": "missing",
+}
+FAULT_MODE_TO_PUBLIC = {
+    "healthy": "healthy",
+    "fault_engine": "fault_engine",
+    "fault_hydraulic": "fault_hydraulic",
+    "fault_bearing": "fault_bearing",
+    "noisy": "noise_spike",
+    "missing": "missing_data",
+}
+VALID_PARTS = {machine["part_needed"] for machine in DEFAULT_FLEET_META}
+MACHINE_TYPES_BY_PREFIX = {"TR": "Tractor", "HV": "Harvester", "SD": "Seeder"}
 
 
 def _generate_single_machine(
@@ -217,7 +242,9 @@ class FleetTelemetryEngine:
         self.num_steps = num_steps
         self.weather_mode = "normal"
         self.model = None
-        self.fleet_meta = [dict(m) for m in DEFAULT_FLEET_META]
+        self._base_fleet_meta = deepcopy(DEFAULT_FLEET_META)
+        self.fleet_meta = deepcopy(self._base_fleet_meta)
+        self._next_machine_seed = max(m["seed"] for m in self.fleet_meta) + 1
         self.telemetry = {}
         self.features = {}
         self._train_leak_free_model()
@@ -271,7 +298,9 @@ class FleetTelemetryEngine:
         self.model.fit(X_train, y_train)
 
     def _build_fleet_data(self):
-        """Generates telemetry and precomputes leak-free features for the active 6-machine fleet."""
+        """Generates telemetry and features for every active fleet machine."""
+        self.telemetry = {}
+        self.features = {}
         for m in self.fleet_meta:
             df = _generate_single_machine(
                 seed=m["seed"],
@@ -283,9 +312,151 @@ class FleetTelemetryEngine:
             self.telemetry[m["id"]] = df
             self.features[m["id"]] = _extract_leak_free_features(df)
 
+    @staticmethod
+    def _normalize_fault_mode(fault_mode: str):
+        if not isinstance(fault_mode, str):
+            return None
+        return FAULT_MODE_TO_INTERNAL.get(fault_mode.strip().lower())
+
+    @staticmethod
+    def _normalize_machine_id(machine_id: str):
+        if not isinstance(machine_id, str):
+            return None
+        normalized = machine_id.strip().upper()
+        if not normalized or not re.fullmatch(r"[A-Z0-9]+(?:-[A-Z0-9]+)*", normalized):
+            return None
+        return normalized
+
+    def add_machine(
+        self,
+        machine_id: str,
+        name: str,
+        part_needed: str,
+        criticality: float = 1.0,
+        fault_mode: str = "healthy",
+        fault_start: int = None,
+    ) -> dict:
+        """Adds a uniquely identified machine and generates its synthetic telemetry."""
+        normalized_id = self._normalize_machine_id(machine_id)
+        if normalized_id is None:
+            return {"ok": False, "message": "Machine ID must contain only letters, numbers, and hyphens."}
+        if normalized_id in self.get_all_machine_ids():
+            return {"ok": False, "message": f"Machine '{normalized_id}' already exists."}
+        if not isinstance(name, str) or not name.strip():
+            return {"ok": False, "message": "Machine name is required."}
+        if not isinstance(part_needed, str) or part_needed not in VALID_PARTS:
+            return {"ok": False, "message": f"Part must be one of: {', '.join(sorted(VALID_PARTS))}."}
+
+        try:
+            priority = float(criticality)
+        except (TypeError, ValueError):
+            return {"ok": False, "message": "Criticality must be a number between 0.8 and 1.5."}
+        if not math.isfinite(priority) or not 0.8 <= priority <= 1.5:
+            return {"ok": False, "message": "Criticality must be between 0.8 and 1.5."}
+
+        internal_mode = self._normalize_fault_mode(fault_mode)
+        if internal_mode is None:
+            return {"ok": False, "message": "Unsupported machine condition."}
+        if fault_start is not None:
+            try:
+                start = int(fault_start)
+            except (TypeError, ValueError):
+                return {"ok": False, "message": "Fault start must be a valid simulation hour."}
+            if not 0 <= start < self.num_steps:
+                return {"ok": False, "message": f"Fault start must be between 0 and {self.num_steps - 1}."}
+        else:
+            start = None if internal_mode == "healthy" else min(25, self.num_steps - 1)
+
+        prefix = normalized_id.split("-", 1)[0]
+        machine = {
+            "id": normalized_id,
+            "name": name.strip(),
+            "type": MACHINE_TYPES_BY_PREFIX.get(prefix, "Tractor"),
+            "part_needed": part_needed,
+            "mode": internal_mode,
+            "fault_start": start,
+            "seed": self._next_machine_seed,
+            "criticality": priority,
+        }
+        self._next_machine_seed += 1
+        self.fleet_meta.append(machine)
+        self._build_fleet_data()
+        return {"ok": True, "message": f"Machine '{normalized_id}' added.", "machine": dict(machine)}
+
+    def update_machine(
+        self,
+        machine_id: str,
+        name: str = None,
+        part_needed: str = None,
+        criticality: float = None,
+        fault_mode: str = None,
+        fault_start: int = None,
+    ) -> dict:
+        """Updates supplied machine metadata and regenerates that fleet's telemetry."""
+        normalized_id = self._normalize_machine_id(machine_id)
+        machine = next((m for m in self.fleet_meta if m["id"] == normalized_id), None)
+        if machine is None:
+            return {"ok": False, "message": f"Machine '{machine_id}' not found."}
+
+        updated = dict(machine)
+        if name is not None:
+            if not isinstance(name, str) or not name.strip():
+                return {"ok": False, "message": "Machine name is required."}
+            updated["name"] = name.strip()
+        if part_needed is not None:
+            if not isinstance(part_needed, str) or part_needed not in VALID_PARTS:
+                return {"ok": False, "message": f"Part must be one of: {', '.join(sorted(VALID_PARTS))}."}
+            updated["part_needed"] = part_needed
+        if criticality is not None:
+            try:
+                priority = float(criticality)
+            except (TypeError, ValueError):
+                return {"ok": False, "message": "Criticality must be a number between 0.8 and 1.5."}
+            if not math.isfinite(priority) or not 0.8 <= priority <= 1.5:
+                return {"ok": False, "message": "Criticality must be between 0.8 and 1.5."}
+            updated["criticality"] = priority
+
+        if fault_mode is not None:
+            internal_mode = self._normalize_fault_mode(fault_mode)
+            if internal_mode is None:
+                return {"ok": False, "message": "Unsupported machine condition."}
+            updated["mode"] = internal_mode
+            if internal_mode == "healthy" and fault_start is None:
+                updated["fault_start"] = None
+            elif fault_start is None and updated.get("fault_start") is None:
+                updated["fault_start"] = min(25, self.num_steps - 1)
+
+        if fault_start is not None:
+            try:
+                start = int(fault_start)
+            except (TypeError, ValueError):
+                return {"ok": False, "message": "Fault start must be a valid simulation hour."}
+            if not 0 <= start < self.num_steps:
+                return {"ok": False, "message": f"Fault start must be between 0 and {self.num_steps - 1}."}
+            updated["fault_start"] = start
+
+        machine.update(updated)
+        self._build_fleet_data()
+        return {"ok": True, "message": f"Machine '{normalized_id}' updated.", "machine": dict(machine)}
+
+    def remove_machine(self, machine_id: str) -> dict:
+        """Removes a machine and its telemetry, retaining at least one fleet unit."""
+        normalized_id = self._normalize_machine_id(machine_id)
+        machine = next((m for m in self.fleet_meta if m["id"] == normalized_id), None)
+        if machine is None:
+            return {"ok": False, "message": f"Machine '{machine_id}' not found."}
+        if len(self.fleet_meta) <= 1:
+            return {"ok": False, "message": "At least one machine must remain in the fleet."}
+
+        self.fleet_meta.remove(machine)
+        self.telemetry.pop(normalized_id, None)
+        self.features.pop(normalized_id, None)
+        return {"ok": True, "message": f"Machine '{normalized_id}' removed.", "machine_id": normalized_id}
+
     def reset_fleet(self):
         """Resets all machines back to the default deterministic harvest scenario."""
-        self.fleet_meta = [dict(m) for m in DEFAULT_FLEET_META]
+        self.fleet_meta = deepcopy(self._base_fleet_meta)
+        self._next_machine_seed = max(m["seed"] for m in self.fleet_meta) + 1
         self.weather_mode = "normal"
         self._build_fleet_data()
 
@@ -451,6 +622,12 @@ class FleetTelemetryEngine:
                     "machine_id": m_id,
                     "name": m["name"],
                     "type": m["type"],
+                    "fault_mode": FAULT_MODE_TO_PUBLIC.get(m["mode"], m["mode"]),
+                    "fault_start": m["fault_start"],
+                    "criticality": m.get(
+                        "criticality",
+                        {"Harvester": 1.25, "Tractor": 1.10, "Seeder": 1.0}.get(m["type"], 1.0),
+                    ),
                     "step": step,
                     "weather_mode": self.weather_mode,
                     "status": status,

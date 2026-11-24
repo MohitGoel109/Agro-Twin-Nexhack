@@ -48,10 +48,20 @@ def run_verification():
             "/sms-card/{machine_id}",
             "/webhook",
             "/webhook/log",
+            "/machines",
+            "/machines/{machine_id}",
         }
         missing = required - set(route_paths)
         assert not missing, f"Missing FastAPI routes: {missing}"
-        print(f"[CHECK 2] FastAPI loaded with {len(required)} verified REST endpoints.")
+        method_map = {
+            (route.path, method)
+            for route in fastapi_app.routes
+            for method in getattr(route, "methods", set())
+        }
+        assert ("/machines", "POST") in method_map
+        assert ("/machines/{machine_id}", "PUT") in method_map
+        assert ("/machines/{machine_id}", "DELETE") in method_map
+        print(f"[CHECK 2] FastAPI loaded with {len(method_map)} verified route methods.")
     except ImportError:
         print("[CHECK 2] FastAPI not installed in current Python env (install via pip install -r requirements.txt).")
 
@@ -115,6 +125,40 @@ def run_verification():
     assert webhook_log[-1]["target"] == "SIMULATED_LOCAL"
     assert webhook_log[-1]["delivered"] is False
     print("[CHECK 9] Weather, ROI, SMS job card, and local webhook logging OK.")
+
+    from backend.app import (
+        MachineCreateRequest,
+        MachineUpdateRequest,
+        add_machine as api_add_machine,
+        delete_machine as api_delete_machine,
+        twin as api_twin,
+        update_machine as api_update_machine,
+    )
+
+    api_twin.reset()
+    created = api_add_machine(
+        MachineCreateRequest(
+            machine_id="TR-107",
+            name="Tractor Golf",
+            part_needed="Coolant Pump",
+            criticality=1.1,
+        )
+    )
+    assert created["ok"] and created["fleet_state"]["machines_total"] == 7
+    updated = api_update_machine(
+        "tr-107",
+        MachineUpdateRequest(name="Tractor Golf Updated", criticality=1.3),
+    )
+    assert updated["ok"]
+    assert next(m for m in updated["fleet_state"]["machines"] if m["machine_id"] == "TR-107")["name"] == "Tractor Golf Updated"
+    scheduled = api_twin.scheduler.schedule_maintenance("TR-107", current_step=0)
+    assert scheduled["ok"]
+    deleted = api_delete_machine("tr-107")
+    assert deleted["ok"] and deleted["cancelled_work_orders"] == [scheduled["work_order"]["wo_id"]]
+    assert deleted["refunded_parts"] == {"Coolant Pump": 1}
+    assert deleted["fleet_state"]["machines_total"] == 6
+    assert "TR-107" not in api_twin.ml_engine.telemetry
+    print("[CHECK 10] FastAPI CRUD handlers add, update, and delete dynamically with resource cleanup.")
 
     print("\nALL CHECKS PASSED! Member 3 (Mohit) backend is 100% ready for Shashi's dashboard.")
     print("=" * 74)

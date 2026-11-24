@@ -176,6 +176,39 @@ def run_verification():
     assert isinstance(card["sms_hi"], str) and card["sms_hi"]
     assert isinstance(card["checklist"], list) and len(card["checklist"]) == 4
 
+    print("\n[TEST 5] Dynamic Fleet Sizing and Deleted-Machine Resource Cleanup:")
+    sched.reset_operations()
+    added = ml_engine.add_machine(
+        machine_id="TR-107",
+        name="Tractor Golf",
+        part_needed="Coolant Pump",
+        criticality=1.3,
+    )
+    assert added["ok"], added["message"]
+    expanded = sched.get_operational_fleet_state(step=0)
+    assert expanded["machines_total"] == len(ml_engine.get_all_machine_ids()) == 7
+    dynamic_comparison = sched.compare_against_calendar_baseline(up_to_step=5)
+    assert len(dynamic_comparison["hourly_series"]) == 6
+
+    scheduled = sched.schedule_maintenance("TR-107", current_step=0)
+    assert scheduled["ok"]
+    assert sched.get_resource_status(step=1)["technicians_busy"] == 1
+    removed_records = sched.remove_machine_records("TR-107", current_step=1)
+    assert removed_records["cancelled_work_orders"] == [scheduled["work_order"]["wo_id"]]
+    assert removed_records["refunded_parts"] == {"Coolant Pump": 1}
+    assert sched.get_resource_status(step=1)["technicians_busy"] == 0
+    assert sched.get_resource_status(step=1)["parts_inventory"]["Coolant Pump"] == 1
+    assert sched.get_all_work_orders(1)[-1]["status"] == "CANCELLED"
+    assert ml_engine.remove_machine("TR-107")["ok"]
+    assert sched.get_operational_fleet_state(step=1)["machines_total"] == 6
+    assert ml_engine.add_machine("TR-107", "Tractor Golf Readded", "Coolant Pump")["ok"]
+    readded_state = sched.get_operational_fleet_state(step=1)
+    readded_machine = next(m for m in readded_state["machines"] if m["machine_id"] == "TR-107")
+    assert readded_machine["open_work_order"] is None
+    assert readded_state["open_work_orders_count"] == 0
+    assert ml_engine.remove_machine("TR-107")["ok"]
+    print("  Seven-machine baseline sizing verified; deletion cancelled WO and released technician/part.")
+
     print("\nALL CHECKS PASSED! Member 2 (Kunal) module is 100% ready for Mohit and Shashi.")
     print("=" * 74)
 

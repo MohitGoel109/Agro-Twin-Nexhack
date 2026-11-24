@@ -82,6 +82,70 @@ class TwinStateManager:
             "history": history,
         }
 
+    def add_machine(
+        self,
+        machine_id: str,
+        name: str,
+        part_needed: str,
+        criticality: float = 1.0,
+        fault_mode: str = "healthy",
+        fault_start: Optional[int] = None,
+    ) -> dict:
+        """Adds a machine through the ML engine and returns the updated fleet state."""
+        if not hasattr(self.ml_engine, "add_machine"):
+            return {"ok": False, "message": "Machine management is unavailable."}
+        result = self.ml_engine.add_machine(
+            machine_id=machine_id,
+            name=name,
+            part_needed=part_needed,
+            criticality=criticality,
+            fault_mode=fault_mode,
+            fault_start=fault_start,
+        )
+        return {
+            **result,
+            "fleet_state": self.scheduler.get_operational_fleet_state(self.current_step),
+        }
+
+    def update_machine(self, machine_id: str, **fields) -> dict:
+        """Updates supplied machine fields and synchronizes existing work-order labels."""
+        if not hasattr(self.ml_engine, "update_machine"):
+            return {"ok": False, "message": "Machine management is unavailable."}
+        result = self.ml_engine.update_machine(machine_id=machine_id, **fields)
+        if result.get("ok"):
+            canonical_id = result["machine"]["id"]
+            machine_name = result["machine"]["name"]
+            for work_order in self.scheduler.work_orders:
+                if work_order["machine_id"] == canonical_id:
+                    work_order["machine_name"] = machine_name
+        return {
+            **result,
+            "fleet_state": self.scheduler.get_operational_fleet_state(self.current_step),
+        }
+
+    def delete_machine(self, machine_id: str) -> dict:
+        """Removes a machine and releases any scheduler resources reserved for it."""
+        if not hasattr(self.ml_engine, "remove_machine"):
+            return {"ok": False, "message": "Machine management is unavailable."}
+        result = self.ml_engine.remove_machine(machine_id)
+        if not result.get("ok"):
+            return {
+                **result,
+                "fleet_state": self.scheduler.get_operational_fleet_state(self.current_step),
+            }
+
+        cleanup = {"ok": True, "cancelled_work_orders": [], "refunded_parts": {}}
+        if hasattr(self.scheduler, "remove_machine_records"):
+            cleanup = self.scheduler.remove_machine_records(
+                machine_id=result["machine_id"],
+                current_step=self.current_step,
+            )
+        return {
+            **result,
+            **cleanup,
+            "fleet_state": self.scheduler.get_operational_fleet_state(self.current_step),
+        }
+
     def acknowledge_alert(
         self,
         machine_id: str,

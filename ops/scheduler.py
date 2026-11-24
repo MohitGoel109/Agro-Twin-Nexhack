@@ -63,6 +63,56 @@ class FleetOperationsScheduler:
         # Tracks scheduled preventive interventions: machine_id -> {start_step, end_step, wo_id}
         self.preventive_interventions = {}
 
+    def remove_machine_records(self, machine_id: str, current_step: int = None) -> dict:
+        """Clears acknowledgements and cancels any reserved work for a deleted machine."""
+        self.acknowledged_alerts.pop(machine_id, None)
+        self.preventive_interventions.pop(machine_id, None)
+
+        cancelled_work_orders = []
+        refunded_parts = {}
+        for work_order in self.work_orders:
+            if work_order["machine_id"] != machine_id:
+                continue
+            if work_order["status"] not in ("SCHEDULED", "IN_PROGRESS"):
+                continue
+            completion_step = work_order.get("completion_step")
+            if current_step is not None and completion_step is not None and current_step >= completion_step:
+                work_order["status"] = "COMPLETED"
+                continue
+
+            part = work_order["part_needed"]
+            self.parts_inventory[part] = self.parts_inventory.get(part, 0) + 1
+            refunded_parts[part] = refunded_parts.get(part, 0) + 1
+            work_order["status"] = "CANCELLED"
+            work_order["cancellation_reason"] = "Machine deleted."
+            if current_step is not None:
+                work_order["cancelled_step"] = int(current_step)
+            cancelled_work_orders.append(work_order["wo_id"])
+            self.event_log.append(
+                {
+                    "step": int(current_step) if current_step is not None else None,
+                    "event": "WO_CANCELLED_MACHINE_DELETED",
+                    "machine_id": machine_id,
+                    "wo_id": work_order["wo_id"],
+                    "part_refunded": part,
+                }
+            )
+
+        self.event_log.append(
+            {
+                "step": int(current_step) if current_step is not None else None,
+                "event": "MACHINE_RECORDS_REMOVED",
+                "machine_id": machine_id,
+                "cancelled_work_orders": cancelled_work_orders,
+                "refunded_parts": refunded_parts,
+            }
+        )
+        return {
+            "ok": True,
+            "cancelled_work_orders": cancelled_work_orders,
+            "refunded_parts": refunded_parts,
+        }
+
     def update_constraints(self, technicians_total: int = None, parts_inventory: dict = None) -> dict:
         """Lets the UI/demo adjust technician count or spare part stock live to test scarcity."""
         if technicians_total is not None:
@@ -109,7 +159,7 @@ class FleetOperationsScheduler:
         if machine_snap["sensor_status"] != "CLEAN":
             return round(machine_snap["fault_probability"] * 15.0, 1)
 
-        crit = MACHINE_CRITICALITY.get(machine_snap["type"], 1.0)
+        crit = machine_snap.get("criticality", MACHINE_CRITICALITY.get(machine_snap["type"], 1.0))
         part_ok = self.parts_inventory.get(machine_snap["part_needed"], 0) > 0
         actionable_factor = 1.0 if part_ok else 0.72
 
@@ -125,7 +175,9 @@ class FleetOperationsScheduler:
     def _get_machine_work_order(self, machine_id: str):
         """Returns the most recent work order for a machine, if any."""
         matching = [wo for wo in self.work_orders if wo["machine_id"] == machine_id]
-        return matching[-1] if matching else None
+        if not matching or matching[-1]["status"] == "CANCELLED":
+            return None
+        return matching[-1]
 
     def _machine_operational_status_at_step(self, m_snap: dict, step: int) -> dict:
         """
@@ -140,7 +192,7 @@ class FleetOperationsScheduler:
         wo_view = None
         if wo is not None:
             wo_view = dict(wo)
-            if wo["status"] != "DEFERRED_SCARCITY":
+            if wo["status"] not in ("DEFERRED_SCARCITY", "CANCELLED"):
                 if step < wo["scheduled_start"]:
                     wo_view["status"] = "SCHEDULED"
                 elif wo["scheduled_start"] <= step < wo["completion_step"]:
@@ -250,7 +302,8 @@ class FleetOperationsScheduler:
         open_wos = [
             m["open_work_order"]
             for m in machines
-            if m["open_work_order"] is not None and m["open_work_order"]["status"] != "COMPLETED"
+            if m["open_work_order"] is not None
+            and m["open_work_order"]["status"] not in ("COMPLETED", "CANCELLED")
         ]
         prevented_count = sum(1 for m in machines if m["breakdown_prevented"])
 
@@ -295,7 +348,7 @@ class FleetOperationsScheduler:
         result = []
         for wo in self.work_orders:
             item = dict(wo)
-            if item["status"] != "DEFERRED_SCARCITY":
+            if item["status"] not in ("DEFERRED_SCARCITY", "CANCELLED"):
                 if current_step < item["scheduled_start"]:
                     item["status"] = "SCHEDULED"
                 elif item["scheduled_start"] <= current_step < item["completion_step"]:
@@ -496,7 +549,7 @@ class FleetOperationsScheduler:
                     continue
                 snap = all_snaps[t][m_id]
                 if snap["sensor_status"] == "CLEAN" and snap["fault_probability"] >= 0.65:
-                    crit = MACHINE_CRITICALITY.get(snap["type"], 1.0)
+                    crit = snap.get("criticality", MACHINE_CRITICALITY.get(snap["type"], 1.0))
                     score = snap["fault_probability"] * snap["confidence"] * crit
                     candidates.append((score, m_id, snap))
 

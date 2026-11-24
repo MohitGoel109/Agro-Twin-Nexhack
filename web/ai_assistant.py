@@ -44,8 +44,6 @@ WEBSITE_KEYWORDS = {
     # Agro-Twin domain & machines
     "agro", "agro-twin", "agrotwin", "twin", "fleet", "machine", "machines", "machinery", "unit",
     "units", "tractor", "tractors", "harvester", "harvesters", "seeder", "seed", "drill",
-    "tr-101", "tr101", "hv-202", "hv202", "tr-103", "tr103", "sd-304", "sd304", "tr-105", "tr105",
-    "hv-206", "hv206", "alpha", "bravo", "charlie", "delta", "echo", "foxtrot",
     # Telemetry, ML & Explainability
     "telemetry", "sensor", "sensors", "temperature", "temp", "engine", "vibration", "oil", "pressure",
     "rpm", "variance", "fault", "faults", "failure", "failures", "breakdown", "breakdowns",
@@ -108,7 +106,13 @@ class AgroTwinAssistant:
 
     def _find_mentioned_machines(self, text_lower: str) -> List[str]:
         found = []
-        for m_id, aliases in MACHINE_ALIASES.items():
+        if hasattr(self.twin.ml_engine, "get_all_machine_ids"):
+            machine_ids = self.twin.ml_engine.get_all_machine_ids()
+        else:
+            machine_ids = list(MACHINE_ALIASES)
+        for m_id in machine_ids:
+            aliases = [m_id.lower(), m_id.replace("-", "").lower()]
+            aliases.extend(MACHINE_ALIASES.get(m_id, []))
             for alias in aliases:
                 if re.search(rf"\b{re.escape(alias)}\b", text_lower):
                     found.append(m_id)
@@ -224,7 +228,7 @@ class AgroTwinAssistant:
                     "2. **Segment 01 (Fleet):** जोखिम और अनिश्चितता बैंड देखें, और **TR-101** पर **Schedule 4h service** दबाकर 18 घंटे का ब्रेकडाउन रोकें।\n"
                     "3. **Segment 02 (SVG X-Ray & Telemetry):** मशीन के इंटरैक्टिव X-Ray ब्लूप्रिंट पर खराब पुर्जे (Coolant Pump, Hydraulic Valve, Drive Bearing) पर क्लिक करें।\n"
                     "4. **Segment 03 (Rupee ROI & Impact):** प्रति घंटा नुकसान (₹) दर्ज करें और Calendar बनाम AI बचत देखें।\n"
-                    "5. **Segment 04 (SMS Job Card & n8n):** प्रत्येक वर्क ऑर्डर के लिए हिंदी/अंग्रेज़ी **SMS Job Card** और **n8n Webhook** अलर्ट देखें।"
+                    "5. **Segment 04 (Operations):** SMS Job Card और n8n Webhook देखें; Fleet Manager से यूनिट जोड़ें, संपादित करें या हटाएं।"
                 )
             else:
                 ans = (
@@ -234,7 +238,7 @@ class AgroTwinAssistant:
                     "2. **Segment 01 — Live Fleet & Interventions:** View fault risk with uncertainty bands and click **Schedule 4h service** on flagged units (try **TR-101** at Hr 35, then jump to **Hr 48 · Saved**).\n"
                     "3. **Segment 02 — SVG X-Ray Blueprint & Telemetry:** Click any subsystem on the interactive machine X-Ray blueprint (**Coolant Pump**, **Hydraulic Valve**, **Drive Bearing**, **Sensor Harness**) and inspect the 4 raw sensor charts.\n"
                     "4. **Segment 03 — Impact & Rupee (₹) ROI:** Adjust hourly harvest loss (`₹/hr`) and part cost (`₹`) to see net Rupee savings and Calendar vs. AI availability.\n"
-                    "5. **Segment 04 — Operations, SMS Job Cards & n8n Webhooks:** Open bilingual **SMS Job Cards** with 4-step mechanic checklists, configure an **n8n Webhook URL**, or inject live faults."
+                    "5. **Segment 04 — Operations & Fleet Manager:** Open bilingual **SMS Job Cards**, configure an **n8n Webhook URL**, inject faults, or add, edit, and remove machines with the Fleet Manager."
                 )
             return {
                 "allowed": True,
@@ -246,6 +250,46 @@ class AgroTwinAssistant:
                     "How do the SVG X-Ray & Heatwave mode work?",
                     "How much Rupee ROI and downtime does Agro-Twin save?",
                     "How do SMS job cards and n8n webhooks work?",
+                ],
+            }
+
+        if any(
+            phrase in lower
+            for phrase in (
+                "fleet manager",
+                "manage machines",
+                "manage the fleet",
+                "add machine",
+                "add machines",
+                "add a machine",
+                "add unit",
+                "new machine",
+                "new unit",
+                "edit machine",
+                "edit machines",
+                "edit a machine",
+                "edit unit",
+                "delete machine",
+                "delete machines",
+                "delete a machine",
+                "delete unit",
+                "remove machine",
+                "remove machines",
+                "remove a machine",
+                "remove unit",
+            )
+        ):
+            return {
+                "allowed": True,
+                "warning": False,
+                "topic": "machine_management",
+                "answer": (
+                    "**Fleet Manager (Segment 04):** Choose **Add new unit** to enter a unique Unit ID, name, criticality (0.8–1.5), part, and condition, then click **Add / Save Unit**. Choose **Edit / delete existing unit** to load a unit, adjust its details, or remove it. Removing a unit cancels its active work orders and releases reserved parts; the final remaining unit cannot be deleted."
+                ),
+                "suggested_questions": [
+                    "Tell me about TR-101",
+                    "How do I add a machine?",
+                    "What needs attention right now?",
                 ],
             }
 

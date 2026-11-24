@@ -184,6 +184,34 @@ def _build_sms_card_fallback(machine_id: str, step: int) -> dict:
     }
 
 
+def _machine_operation(operation: str, **kwargs) -> dict:
+    """Uses the state-manager CRUD bridge, falling back to ML/scheduler methods."""
+    state_method = getattr(twin, operation, None)
+    if callable(state_method):
+        return state_method(**kwargs)
+
+    engine_operation = "remove_machine" if operation == "delete_machine" else operation
+    engine_method = getattr(twin.ml_engine, engine_operation, None)
+    if not callable(engine_method):
+        return {"ok": False, "message": "Machine management is unavailable."}
+
+    result = engine_method(**kwargs)
+    if result.get("ok"):
+        if operation == "delete_machine" and hasattr(twin.scheduler, "remove_machine_records"):
+            twin.scheduler.remove_machine_records(
+                machine_id=result["machine_id"],
+                current_step=twin.current_step,
+            )
+        elif operation == "update_machine":
+            machine_name = result["machine"]["name"]
+            canonical_id = result["machine"]["id"]
+            for work_order in twin.scheduler.work_orders:
+                if work_order["machine_id"] == canonical_id:
+                    work_order["machine_name"] = machine_name
+        result["fleet_state"] = twin.get_fleet_state()
+    return result
+
+
 # ---------------- Main Page ----------------
 
 @app.route("/")
@@ -227,6 +255,51 @@ def api_machine_history(machine_id):
     res = twin.get_machine_detail(machine_id=machine_id, up_to_step=up_to_step)
     if not res.get("ok"):
         return jsonify(res), 404
+    return jsonify(res)
+
+
+@app.route("/api/machines", methods=["POST"])
+def api_add_machine():
+    data = request.get_json(silent=True) or {}
+    res = _machine_operation(
+        "add_machine",
+        machine_id=data.get("machine_id"),
+        name=data.get("name"),
+        part_needed=data.get("part_needed"),
+        criticality=data.get("criticality", 1.0),
+        fault_mode=data.get("fault_mode", "healthy"),
+        fault_start=data.get("fault_start"),
+    )
+    if not res.get("ok"):
+        message = res.get("message", "Machine could not be added.")
+        status_code = 409 if "already exists" in message.lower() else 400
+        return jsonify(res), status_code
+    return jsonify(res)
+
+
+@app.route("/api/machines/<machine_id>", methods=["PUT"])
+def api_update_machine(machine_id):
+    data = request.get_json(silent=True) or {}
+    fields = {
+        key: data[key]
+        for key in ("name", "part_needed", "criticality", "fault_mode", "fault_start")
+        if key in data
+    }
+    res = _machine_operation("update_machine", machine_id=machine_id, **fields)
+    if not res.get("ok"):
+        message = res.get("message", "Machine could not be updated.")
+        status_code = 404 if "not found" in message.lower() else 400
+        return jsonify(res), status_code
+    return jsonify(res)
+
+
+@app.route("/api/machines/<machine_id>", methods=["DELETE"])
+def api_delete_machine(machine_id):
+    res = _machine_operation("delete_machine", machine_id=machine_id)
+    if not res.get("ok"):
+        message = res.get("message", "Machine could not be removed.")
+        status_code = 404 if "not found" in message.lower() else 400
+        return jsonify(res), status_code
     return jsonify(res)
 
 

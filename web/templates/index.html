@@ -452,6 +452,62 @@
             </div>
 
             <div class="sub-block">
+                <div class="info-card fleet-manager-card">
+                    <h3 class="sub-title">Fleet Manager</h3>
+                    <p class="sub-desc">Add, edit, or remove machines from the live fleet. Criticality is used by the maintenance priority score.</p>
+                    <div class="form-grid fleet-manager-grid">
+                        <div class="form-field">
+                            <label for="fleet-manager-mode">Action</label>
+                            <select id="fleet-manager-mode" class="select-input">
+                                <option value="add">Add new unit</option>
+                                <option value="edit">Edit / delete existing unit</option>
+                            </select>
+                        </div>
+                        <div class="form-field hidden" id="fleet-manager-unit-field">
+                            <label for="fleet-manager-unit-select">Existing unit</label>
+                            <select id="fleet-manager-unit-select" class="select-input"></select>
+                        </div>
+                        <div class="form-field">
+                            <label for="fleet-manager-id">Unit ID</label>
+                            <input id="fleet-manager-id" class="text-input" type="text" maxlength="24" placeholder="e.g. TR-107" />
+                        </div>
+                        <div class="form-field">
+                            <label for="fleet-manager-name">Name</label>
+                            <input id="fleet-manager-name" class="text-input" type="text" maxlength="80" placeholder="Machine name" />
+                        </div>
+                        <div class="form-field">
+                            <label for="fleet-manager-criticality">Criticality (0.8–1.5)</label>
+                            <input id="fleet-manager-criticality" class="text-input" type="number" min="0.8" max="1.5" step="0.1" value="1.0" />
+                        </div>
+                        <div class="form-field">
+                            <label for="fleet-manager-part">Part needed</label>
+                            <select id="fleet-manager-part" class="select-input">
+                                <option>Coolant Pump</option>
+                                <option>Hydraulic Valve</option>
+                                <option>Drive Bearing</option>
+                                <option>Sensor Harness</option>
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label for="fleet-manager-condition">Condition</label>
+                            <select id="fleet-manager-condition" class="select-input">
+                                <option value="healthy">Healthy</option>
+                                <option value="fault_engine">Engine fault</option>
+                                <option value="fault_hydraulic">Hydraulic fault</option>
+                                <option value="fault_bearing">Bearing fault</option>
+                                <option value="noise_spike">Sensor noise spike</option>
+                                <option value="missing_data">Missing sensor data</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="unit-actions fleet-manager-actions">
+                        <button id="btn-save-machine" class="btn btn-amber">Add / Save Unit</button>
+                        <button id="btn-delete-machine" class="btn btn-outline-danger" disabled>Delete Unit</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sub-block">
                 <h3 class="sub-title">Maintenance work orders &amp; rural SMS dispatch cards</h3>
                 <div class="table-wrap">
                     <table class="data-table">

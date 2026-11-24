@@ -238,6 +238,16 @@ function initRevealAndSegments() {
 
 /* ---------------- 4. Toast Helper & Fetch Wrapper ---------------- */
 let toastTimer = null;
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    })[char]);
+}
+
 function showToast(msg, kind = "info") {
     const el = document.getElementById("toast-banner");
     if (!el) return;
@@ -390,6 +400,9 @@ function renderFleetCards(fleet) {
 
     fleet.machines.forEach((m, idx) => {
         const meta = STATUS_META[m.status] || { label: m.status, labelHi: m.status, color: "#524f47", cls: "" };
+        const machineId = escapeHtml(m.machine_id);
+        const machineName = escapeHtml(m.name);
+        const partNeeded = escapeHtml(m.part_needed);
         const badgeText = STATE.lang === "hi" ? meta.labelHi : meta.label;
         const riskPct = Math.round(m.fault_probability * 100);
         const uncPct = Math.round(m.uncertainty * 100);
@@ -406,14 +419,14 @@ function renderFleetCards(fleet) {
             const schedLabel = STATE.lang === "hi" ? `4h सर्विस बुक करें (${m.part_needed})` : `Schedule 4h service (${m.part_needed})`;
             actionHtml = `
                 <div class="unit-actions">
-                    <button class="btn btn-amber" data-schedule="${m.machine_id}">${schedLabel}</button>
-                    ${!m.acknowledged ? `<button class="btn btn-subtle" data-ack="${m.machine_id}">Acknowledge</button>` : ""}
+                    <button class="btn btn-amber" data-schedule="${machineId}">${escapeHtml(schedLabel)}</button>
+                    ${!m.acknowledged ? `<button class="btn btn-subtle" data-ack="${machineId}">Acknowledge</button>` : ""}
                 </div>
             `;
         } else if (m.status === "DATA_CHECK" && !m.acknowledged) {
             actionHtml = `
                 <div class="unit-actions">
-                    <button class="btn btn-subtle" data-ack="${m.machine_id}">Log sensor check</button>
+                    <button class="btn btn-subtle" data-ack="${machineId}">Log sensor check</button>
                 </div>
             `;
         }
@@ -421,8 +434,8 @@ function renderFleetCards(fleet) {
         card.innerHTML = `
             <div class="unit-top">
                 <div>
-                    <span class="unit-id">${m.machine_id}</span>
-                    <span class="unit-name">${m.name}</span>
+                    <span class="unit-id">${machineId}</span>
+                    <span class="unit-name">${machineName}</span>
                 </div>
                 <span class="status-tag" style="background:${meta.color};">${badgeText}</span>
             </div>
@@ -433,8 +446,12 @@ function renderFleetCards(fleet) {
             <div class="unit-metrics">
                 Risk ${riskPct}% (±${uncPct}%) &nbsp;|&nbsp; Confidence ${confPct}% &nbsp;|&nbsp; ${feedLabel}${ackTag}
             </div>
-            <div class="unit-reasons">${m.reasons.join(" · ")}</div>
+            <div class="unit-reasons">${m.reasons.map(escapeHtml).join(" · ")}</div>
             ${actionHtml}
+            <div class="unit-actions unit-manage-actions">
+                <button class="btn btn-outline-danger" data-delete-machine="${machineId}" ${fleet.machines.length <= 1 ? "disabled" : ""}>Remove unit</button>
+                <span class="unit-part-note">${partNeeded}</span>
+            </div>
         `;
 
         grid.appendChild(card);
@@ -464,6 +481,12 @@ function renderFleetCards(fleet) {
             await refreshAll();
         });
     });
+
+    grid.querySelectorAll("[data-delete-machine]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            await removeMachine(btn.dataset.deleteMachine);
+        });
+    });
 }
 
 function renderPriorityQueue(fleet) {
@@ -478,14 +501,14 @@ function renderPriorityQueue(fleet) {
             const meta = STATUS_META[p.status] || { label: p.status };
             return `
                 <tr>
-                    <td style="font-family:'IBM Plex Mono',monospace;">${p.machine_id}</td>
-                    <td>${p.name}</td>
-                    <td>${meta.label}</td>
+                    <td style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(p.machine_id)}</td>
+                    <td>${escapeHtml(p.name)}</td>
+                    <td>${escapeHtml(meta.label)}</td>
                     <td style="font-family:'IBM Plex Mono',monospace;color:#e59a32;">${p.priority_score}</td>
                     <td style="font-family:'IBM Plex Mono',monospace;">${Math.round(p.fault_probability * 100)}%</td>
                     <td style="font-family:'IBM Plex Mono',monospace;">${Math.round(p.confidence * 100)}%</td>
-                    <td>${p.part_needed} (${p.part_in_stock})</td>
-                    <td style="color:#a8a296;">${p.recommended_action}</td>
+                    <td>${escapeHtml(p.part_needed)} (${p.part_in_stock})</td>
+                    <td style="color:#a8a296;">${escapeHtml(p.recommended_action)}</td>
                 </tr>
             `;
         })
@@ -502,14 +525,14 @@ function renderWorkOrdersAndLog(fleet) {
                 (w) => `
                 <tr>
                     <td style="font-family:'IBM Plex Mono',monospace;">${w.wo_id}</td>
-                    <td>${w.machine_id} — ${w.machine_name}</td>
-                    <td>${w.part_needed}</td>
-                    <td style="font-family:'IBM Plex Mono',monospace;color:#e59a32;">${w.status}</td>
+                    <td>${escapeHtml(w.machine_id)} — ${escapeHtml(w.machine_name)}</td>
+                    <td>${escapeHtml(w.part_needed)}</td>
+                    <td style="font-family:'IBM Plex Mono',monospace;color:#e59a32;">${escapeHtml(w.status)}</td>
                     <td style="font-family:'IBM Plex Mono',monospace;">${
                         w.scheduled_start !== null ? `Hr ${w.scheduled_start}–${w.completion_step}` : "Deferred"
                     }</td>
-                    <td style="color:#a8a296;">${w.reason}</td>
-                    <td><button class="btn btn-subtle" data-sms-unit="${w.machine_id}">View SMS Card</button></td>
+                    <td style="color:#a8a296;">${escapeHtml(w.reason || w.cancellation_reason || "")}</td>
+                    <td>${w.status !== "CANCELLED" ? `<button class="btn btn-subtle" data-sms-unit="${escapeHtml(w.machine_id)}">View SMS Card</button>` : "—"}</td>
                 </tr>
             `
             )
@@ -527,10 +550,10 @@ function renderWorkOrdersAndLog(fleet) {
         logBox.innerHTML = [...fleet.recent_events]
             .reverse()
             .map((e) => {
-                const stepStr = e.step !== undefined ? `[Hr ${e.step}] ` : "";
-                const target = e.machine_id ? ` · ${e.machine_id}` : "";
-                const wo = e.wo_id ? ` · ${e.wo_id}` : "";
-                return `<div class="audit-item">${stepStr}<strong style="color:#f3efe6;">${e.event}</strong>${target}${wo}</div>`;
+                const stepStr = e.step !== undefined && e.step !== null ? `[Hr ${escapeHtml(e.step)}] ` : "";
+                const target = e.machine_id ? ` · ${escapeHtml(e.machine_id)}` : "";
+                const wo = e.wo_id ? ` · ${escapeHtml(e.wo_id)}` : "";
+                return `<div class="audit-item">${stepStr}<strong style="color:#f3efe6;">${escapeHtml(e.event)}</strong>${target}${wo}</div>`;
             })
             .join("");
     }
@@ -548,7 +571,7 @@ async function openSmsJobCard(machineId) {
     document.getElementById("sms-en-text").textContent = res.sms_en;
     document.getElementById("sms-hi-text").textContent = res.sms_hi;
     document.getElementById("sms-checklist").innerHTML = (res.checklist || [])
-        .map((step) => `<li>${step}</li>`)
+        .map((step) => `<li>${escapeHtml(step)}</li>`)
         .join("");
     panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -615,19 +638,19 @@ async function refreshTelemetry() {
     updateXrayBlueprint(m);
 
     document.getElementById("telemetry-explain-box").innerHTML = `
-        <div><strong>Unit:</strong> ${m.machine_id} — ${m.name}</div>
-        <div><strong>State:</strong> ${meta.label} &nbsp;|&nbsp; <strong>Feed:</strong> ${SENSOR_LABELS[m.sensor_status] || m.sensor_status}</div>
+        <div><strong>Unit:</strong> ${escapeHtml(m.machine_id)} — ${escapeHtml(m.name)}</div>
+        <div><strong>State:</strong> ${escapeHtml(meta.label)} &nbsp;|&nbsp; <strong>Feed:</strong> ${escapeHtml(SENSOR_LABELS[m.sensor_status] || m.sensor_status)}</div>
         <div><strong>Fault Risk:</strong> ${(m.fault_probability * 100).toFixed(1)}% (±${(m.uncertainty * 100).toFixed(1)}% uncertainty) &nbsp;|&nbsp; <strong>Confidence:</strong> ${(m.confidence * 100).toFixed(0)}%</div>
-        <div><strong>Findings:</strong><br>${m.reasons.map((r) => `• ${r}`).join("<br>")}</div>
+        <div><strong>Findings:</strong><br>${m.reasons.map((r) => `• ${escapeHtml(r)}`).join("<br>")}</div>
     `;
 
     if (STATE.health && STATE.health.model_info) {
         const info = STATE.health.model_info;
         document.getElementById("model-rules-box").innerHTML = `
-            <div><strong>Model:</strong> ${info.model_type}</div>
-            <div><strong>Noise Filter:</strong> ${info.noise_filter}</div>
-            <div><strong>Leak-Free Guarantee:</strong> ${info.leak_free_guarantee}</div>
-            <div><strong>Uncertainty Method:</strong> ${info.uncertainty_method}</div>
+            <div><strong>Model:</strong> ${escapeHtml(info.model_type)}</div>
+            <div><strong>Noise Filter:</strong> ${escapeHtml(info.noise_filter)}</div>
+            <div><strong>Leak-Free Guarantee:</strong> ${escapeHtml(info.leak_free_guarantee)}</div>
+            <div><strong>Uncertainty Method:</strong> ${escapeHtml(info.uncertainty_method)}</div>
         `;
     }
 
@@ -787,28 +810,78 @@ async function refreshComparison() {
 }
 
 /* ---------------- 8. Dropdowns, Refresh & Controls ---------------- */
-let dropdownsInitialized = false;
 function syncMachineSelects(machines) {
-    if (dropdownsInitialized) return;
-    dropdownsInitialized = true;
-
     const telSel = document.getElementById("telemetry-unit-select");
     const injSel = document.getElementById("inj-machine");
+    const managerSel = document.getElementById("fleet-manager-unit-select");
+    const currentInjId = injSel.value;
+    const currentManagerId = managerSel.value;
+    const machineIds = new Set(machines.map((machine) => machine.machine_id));
 
-    machines.forEach((m) => {
-        const opt1 = document.createElement("option");
-        opt1.value = m.machine_id;
-        opt1.textContent = `${m.machine_id} — ${m.name}`;
-        telSel.appendChild(opt1);
-
-        const opt2 = document.createElement("option");
-        opt2.value = m.machine_id;
-        opt2.textContent = `${m.machine_id} — ${m.name}`;
-        injSel.appendChild(opt2);
+    [telSel, injSel, managerSel].forEach((select) => {
+        const selectedId = select === telSel
+            ? STATE.selectedTelemetryUnit
+            : select === injSel
+                ? currentInjId
+                : currentManagerId;
+        select.replaceChildren();
+        machines.forEach((machine) => {
+            const option = document.createElement("option");
+            option.value = machine.machine_id;
+            option.textContent = `${machine.machine_id} — ${machine.name}`;
+            select.appendChild(option);
+        });
+        if (machineIds.has(selectedId)) {
+            select.value = selectedId;
+        } else if (select === injSel) {
+            select.value = machines[machines.length - 1].machine_id;
+        } else if (machines.length) {
+            select.value = machines[0].machine_id;
+        }
     });
 
-    telSel.value = STATE.selectedTelemetryUnit;
-    injSel.value = machines[machines.length - 1].machine_id;
+    STATE.selectedTelemetryUnit = telSel.value;
+    syncFleetManagerMode();
+    if (document.getElementById("fleet-manager-mode").value === "edit") {
+        populateFleetManagerForm(managerSel.value);
+    }
+}
+
+function populateFleetManagerForm(machineId) {
+    const machine = STATE.fleet?.machines.find((item) => item.machine_id === machineId);
+    if (!machine) return;
+    document.getElementById("fleet-manager-id").value = machine.machine_id;
+    document.getElementById("fleet-manager-name").value = machine.name;
+    document.getElementById("fleet-manager-criticality").value = machine.criticality ?? 1.0;
+    document.getElementById("fleet-manager-part").value = machine.part_needed;
+    document.getElementById("fleet-manager-condition").value = machine.fault_mode || "healthy";
+}
+
+function syncFleetManagerMode() {
+    const isEditing = document.getElementById("fleet-manager-mode").value === "edit";
+    const machineField = document.getElementById("fleet-manager-unit-field");
+    const idInput = document.getElementById("fleet-manager-id");
+    const deleteButton = document.getElementById("btn-delete-machine");
+    machineField.classList.toggle("hidden", !isEditing);
+    idInput.readOnly = isEditing;
+    deleteButton.disabled = !isEditing || !STATE.fleet || STATE.fleet.machines.length <= 1;
+}
+
+async function removeMachine(machineId) {
+    if (!STATE.fleet || STATE.fleet.machines.length <= 1) {
+        showToast("At least one machine must remain in the fleet.", "warning");
+        return;
+    }
+    if (!window.confirm(`Delete ${machineId} from the fleet? Active work orders will be cancelled and reserved parts released.`)) {
+        return;
+    }
+    const res = await apiJson(`/api/machines/${encodeURIComponent(machineId)}`, { method: "DELETE" });
+    showToast(res.message || "Machine could not be removed.", res.ok ? "success" : "warning");
+    if (res.ok) {
+        await refreshAll();
+        await refreshComparison();
+        await refreshRoi();
+    }
 }
 
 async function refreshAll() {
@@ -897,6 +970,63 @@ function initControls() {
     document.getElementById("telemetry-unit-select").addEventListener("change", async (e) => {
         STATE.selectedTelemetryUnit = e.target.value;
         await refreshTelemetry();
+    });
+
+    const managerMode = document.getElementById("fleet-manager-mode");
+    const managerUnit = document.getElementById("fleet-manager-unit-select");
+    managerMode.addEventListener("change", () => {
+        syncFleetManagerMode();
+        if (managerMode.value === "edit") {
+            populateFleetManagerForm(managerUnit.value);
+        } else {
+            document.getElementById("fleet-manager-id").value = "";
+            document.getElementById("fleet-manager-name").value = "";
+            document.getElementById("fleet-manager-criticality").value = "1.0";
+            document.getElementById("fleet-manager-part").value = "Coolant Pump";
+            document.getElementById("fleet-manager-condition").value = "healthy";
+        }
+    });
+    managerUnit.addEventListener("change", () => populateFleetManagerForm(managerUnit.value));
+
+    document.getElementById("btn-save-machine").addEventListener("click", async () => {
+        const machineId = document.getElementById("fleet-manager-id").value.trim();
+        const name = document.getElementById("fleet-manager-name").value.trim();
+        const criticality = Number(document.getElementById("fleet-manager-criticality").value);
+        if (!machineId || !name || !Number.isFinite(criticality) || criticality < 0.8 || criticality > 1.5) {
+            showToast("Enter a Unit ID, name, and criticality between 0.8 and 1.5.", "warning");
+            return;
+        }
+
+        const payload = {
+            name,
+            part_needed: document.getElementById("fleet-manager-part").value,
+            criticality,
+            fault_mode: document.getElementById("fleet-manager-condition").value,
+        };
+        const isEditing = managerMode.value === "edit";
+        const res = await apiJson(
+            isEditing ? `/api/machines/${encodeURIComponent(machineId)}` : "/api/machines",
+            {
+                method: isEditing ? "PUT" : "POST",
+                body: JSON.stringify(isEditing ? payload : { ...payload, machine_id: machineId }),
+            }
+        );
+        showToast(res.message || "Machine could not be saved.", res.ok ? "success" : "warning");
+        if (res.ok) {
+            managerMode.value = "edit";
+            await refreshAll();
+            if (!isEditing) {
+                managerUnit.value = res.machine.id;
+                populateFleetManagerForm(managerUnit.value);
+                syncFleetManagerMode();
+            }
+            await refreshComparison();
+            await refreshRoi();
+        }
+    });
+
+    document.getElementById("btn-delete-machine").addEventListener("click", async () => {
+        await removeMachine(managerUnit.value);
     });
 
     // Clickable SVG X-Ray Blueprint Subsystems

@@ -69,6 +69,44 @@ def run_verification():
     engine.set_weather_mode("normal")
     assert engine.get_model_info()["weather_mode"] == "normal", "Switching back should restore normal weather"
 
+    print("\n[TEST 4] Dynamic Fleet CRUD, Condition Aliases, and Clean Reset:")
+    added = engine.add_machine(
+        machine_id="TR-107",
+        name="Tractor Golf",
+        part_needed="Sensor Harness",
+        criticality=1.4,
+        fault_mode="noise_spike",
+    )
+    assert added["ok"], added["message"]
+    assert "TR-107" in engine.telemetry and "TR-107" in engine.features
+    assert added["machine"]["fault_start"] == 25
+    assert engine.get_model_info()["fleet_size"] == 7
+    assert engine.add_machine("TR-108", "Invalid", "Sensor Harness", fault_mode="unknown")["ok"] is False
+
+    updated = engine.update_machine(
+        "tr-107",
+        name="Tractor Golf Updated",
+        part_needed="Coolant Pump",
+        criticality=1.2,
+        fault_mode="fault_bearing",
+        fault_start=40,
+    )
+    assert updated["ok"], updated["message"]
+    updated_snapshot = {m["machine_id"]: m for m in engine.get_fleet_snapshot(step=40)}["TR-107"]
+    assert updated_snapshot["name"] == "Tractor Golf Updated"
+    assert updated_snapshot["part_needed"] == "Coolant Pump"
+    assert updated_snapshot["criticality"] == 1.2
+    assert updated_snapshot["fault_mode"] == "fault_bearing"
+
+    removed = engine.remove_machine("TR-107")
+    assert removed["ok"]
+    assert "TR-107" not in engine.telemetry and "TR-107" not in engine.features
+    assert "TR-107" not in engine.get_all_machine_ids()
+    engine.reset_fleet()
+    assert len(engine.get_all_machine_ids()) == 6
+    assert set(engine.telemetry) == set(engine.get_all_machine_ids())
+    print("  TR-107 added, edited, removed, and reset without stale telemetry or features.")
+
     print("\nALL CHECKS PASSED! Member 1 (Vansh) module is 100% ready for Kunal, Mohit, and Shashi.")
     print("=" * 72)
 
