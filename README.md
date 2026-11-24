@@ -1,4 +1,4 @@
-# Agro-Twin — Predictive Maintenance Digital Twin for Farm Machinery
+# 🚜 Agro-Twin — Predictive Maintenance Digital Twin for Farm Machinery
 
 > **NexHack 2.0** (Geeta University, Panipat) | **Track:** AI in Agriculture — **Problem Statement 08**  
 > **Team:** Deadline Dominators (Vansh, Kunal, Mohit, Shashi)
