@@ -214,8 +214,6 @@ class AgroTwinAssistant:
         fleet = self.twin.get_fleet_state()
         step = fleet["step"]
         machines_by_id = {m["machine_id"]: m for m in fleet["machines"]}
-        health = self.twin.get_health()
-        comp = self.twin.get_baseline_comparison()
 
         # 1. Website Walkthrough
         if reason in ("greeting", "how_to_use") or any(
@@ -347,6 +345,7 @@ class AgroTwinAssistant:
 
         # 5. Rupee ROI & Baseline Comparison
         if any(k in lower for k in ["rupee", "rupees", "inr", "roi", "cost", "money", "profit", "revenue", "financial", "calendar", "baseline", "compare", "comparison", "save", "saved", "savings", "downtime", "lead time", "availability", "impact"]):
+            comp = self.twin.get_baseline_comparison()
             cal = comp["calendar_only"]
             ai = comp["ai_twin"]
             imp = comp["improvement"]
@@ -374,6 +373,7 @@ class AgroTwinAssistant:
 
         # 6. Noise / Missing data / Uncertainty / Leak-free ML explanation
         if any(k in lower for k in ["noise", "noisy", "spike", "missing", "dropout", "uncertainty", "confidence", "leak", "random forest", "model", "median", "explain"]):
+            health = self.twin.get_health()
             info = health["model_info"]
             return {
                 "allowed": True,

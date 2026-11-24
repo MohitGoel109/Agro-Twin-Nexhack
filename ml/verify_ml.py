@@ -3,6 +3,7 @@ One-command verification script for Member 1 (Vansh).
 Run from repo root: python ml/verify_ml.py
 """
 
+import math
 import os
 import sys
 
@@ -40,6 +41,20 @@ def run_verification():
     assert by_id["SD-304"]["sensor_status"] == "SENSOR_NOISE_FILTERED", "SD-304 spike at Hour 35 should be filtered as noise"
     assert by_id["TR-105"]["sensor_status"] == "MISSING_DATA_HOLD", "TR-105 missing readings at Hour 35 should trigger MISSING_DATA_HOLD"
     assert by_id["TR-105"]["uncertainty"] > by_id["HV-206"]["uncertainty"], "Missing data must raise uncertainty above healthy machine"
+
+    comparison_history = engine.get_fleet_comparison_history(up_to_step=35)
+    for step in (0, 35):
+        direct = {item["machine_id"]: item for item in engine.get_fleet_snapshot(step)}
+        batched = {item["machine_id"]: item for item in comparison_history[step]}
+        for machine_id, snapshot in direct.items():
+            comparison_snapshot = batched[machine_id]
+            for key in ("status", "sensor_status", "actual_breakdown_step", "part_needed", "criticality"):
+                assert comparison_snapshot[key] == snapshot[key], f"{machine_id} differs at Hour {step}: {key}"
+            for key in ("fault_probability", "confidence"):
+                assert math.isclose(comparison_snapshot[key], snapshot[key], abs_tol=0.001), (
+                    f"{machine_id} differs at Hour {step}: {key}"
+                )
+    print("[TEST 1A] Batched comparison history matches individual fleet snapshots.")
 
     print("\n[TEST 2] Live Fault Injection Check (Injecting bearing fault into HV-206 at Hour 50):")
     ok = engine.inject_fault("HV-206", start_step=50, fault_type="fault_bearing")

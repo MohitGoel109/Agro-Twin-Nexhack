@@ -482,10 +482,17 @@ class FleetOperationsScheduler:
         machine_ids = self.ml_engine.get_all_machine_ids()
         n_machines = len(machine_ids)
 
-        all_snaps = [
-            {m["machine_id"]: m for m in self.ml_engine.get_fleet_snapshot(t)}
-            for t in range(total_hours)
-        ]
+        history_method = getattr(self.ml_engine, "get_fleet_comparison_history", None)
+        if callable(history_method):
+            all_snaps = [
+                {m["machine_id"]: m for m in snapshots}
+                for snapshots in history_method(up_to_step=max_step)
+            ]
+        else:
+            all_snaps = [
+                {m["machine_id"]: m for m in self.ml_engine.get_fleet_snapshot(t)}
+                for t in range(total_hours)
+            ]
 
         # ---------------- POLICY 1: CALENDAR-ONLY BASELINE ----------------
         cal_repaired = set()

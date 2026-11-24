@@ -7,6 +7,7 @@ Run from repo root:
 import ast
 import os
 import sys
+from unittest.mock import patch
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
@@ -82,6 +83,15 @@ def run_verification():
         assert res["topic"] == expected_topic, f"Unexpected topic for '{q}': {res['topic']}"
     print(f"[CHECK 3] Passed {len(on_topic_tests)}/{len(on_topic_tests)} live on-topic queries (English + Hindi).")
 
+    with patch.object(
+        twin,
+        "get_baseline_comparison",
+        side_effect=AssertionError("Non-ROI assistant queries must not compute the baseline comparison."),
+    ):
+        guide_res = bot.answer("How do I use this website?")
+    assert guide_res["topic"] == "website_guide"
+    print("[CHECK 3a] Non-ROI assistant responses skip the expensive baseline comparison.")
+
     dynamic_twin = TwinStateManager(num_steps=120, technicians_total=2)
     dynamic_bot = AgroTwinAssistant(dynamic_twin)
     assert dynamic_bot._find_mentioned_machines("Tell me about TR-107") == []
@@ -132,6 +142,11 @@ def run_verification():
         from web.app import app as flask_app
         client = flask_app.test_client()
         assert client.get("/").status_code == 200
+        assistant_res = client.post(
+            "/api/assistant",
+            json={"question": "How do I use this website?", "lang": "en"},
+        ).get_json()
+        assert assistant_res["allowed"] and assistant_res["topic"] == "website_guide"
         w_res = client.post("/api/weather", json={"weather_mode": "heatwave_45c"}).get_json()
         assert w_res["ok"] and w_res["ambient_temp_c"] == 45
         client.post("/api/weather", json={"weather_mode": "normal"})
@@ -168,7 +183,7 @@ def run_verification():
         assert deleted["refunded_parts"] == {"Coolant Pump": 1}
         client.post("/api/reset")
         print("[CHECK 6] Flask CRUD endpoints dynamically add, edit, and remove machines with cleanup.")
-        print("[CHECK 7] Existing Flask weather, ROI, SMS, webhook, and home routes verified.")
+        print("[CHECK 7] Flask AI assistant, weather, ROI, SMS, webhook, and home routes verified.")
     except ImportError:
         print("[CHECK 5] Flask not installed in this sandbox env (install via: pip install -r requirements.txt).")
 

@@ -644,6 +644,76 @@ class FleetTelemetryEngine:
 
         return snapshot
 
+    def get_fleet_comparison_history(self, up_to_step: int = None) -> list:
+        """Builds comparison snapshots with batched tree predictions across the replay."""
+        max_step = self.num_steps - 1 if up_to_step is None else min(int(up_to_step), self.num_steps - 1)
+        total_hours = max_step + 1
+        history = [[] for _ in range(total_hours)]
+
+        for machine in self.fleet_meta:
+            machine_id = machine["id"]
+            features = self.features[machine_id].iloc[:total_hours]
+            telemetry = self.telemetry[machine_id].iloc[:total_hours]
+            feature_values = features[FEATURE_COLS].to_numpy()
+            tree_probabilities = np.asarray(
+                [tree.predict_proba(feature_values)[:, 1] for tree in self.model.estimators_]
+            )
+            fault_probabilities = np.mean(tree_probabilities, axis=0)
+            tree_stds = np.std(tree_probabilities, axis=0)
+
+            for step in range(total_hours):
+                feature_row = features.iloc[step]
+                raw_row = telemetry.iloc[step]
+                fault_probability = float(fault_probabilities[step])
+                missing_count = int(feature_row["missing_recent"])
+                spike_flag = int(feature_row["spike_flag"])
+                uncertainty = min(
+                    0.45,
+                    round(float(tree_stds[step]) + (0.06 * missing_count) + (0.12 * spike_flag), 3),
+                )
+                confidence = round(max(0.10, 1.0 - uncertainty * 2.0), 3)
+
+                if missing_count >= 3 and fault_probability < 0.65:
+                    sensor_status = "MISSING_DATA_HOLD"
+                elif spike_flag == 1 and fault_probability < 0.55:
+                    sensor_status = "SENSOR_NOISE_FILTERED"
+                else:
+                    sensor_status = "CLEAN"
+
+                breakdown_step = int(raw_row["breakdown_step"])
+                if breakdown_step != -1 and step >= breakdown_step:
+                    status = "BROKEN_DOWN"
+                    fault_probability = 1.0
+                elif fault_probability >= 0.70 and sensor_status == "CLEAN":
+                    status = "CRITICAL_WARNING"
+                elif fault_probability >= 0.40 and sensor_status == "CLEAN":
+                    status = "EARLY_WARNING"
+                elif sensor_status != "CLEAN":
+                    status = "DATA_CHECK"
+                else:
+                    status = "HEALTHY"
+
+                history[step].append(
+                    {
+                        "machine_id": machine_id,
+                        "type": machine["type"],
+                        "status": status,
+                        "sensor_status": sensor_status,
+                        "fault_probability": round(fault_probability, 3),
+                        "confidence": confidence,
+                        "part_needed": machine["part_needed"],
+                        "actual_breakdown_step": breakdown_step if breakdown_step != -1 else None,
+                        "criticality": machine.get(
+                            "criticality",
+                            {"Harvester": 1.25, "Tractor": 1.10, "Seeder": 1.0}.get(
+                                machine["type"], 1.0
+                            ),
+                        ),
+                    }
+                )
+
+        return history
+
     def get_machine_history(self, machine_id: str, up_to_step: int) -> list:
         """Returns hourly sensor history up to `up_to_step` for plotting in the UI."""
         if machine_id not in self.telemetry:
