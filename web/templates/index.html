@@ -35,6 +35,13 @@
             </nav>
 
             <div class="topbar-actions">
+                <select id="theme-select" class="theme-select" aria-label="Choose website theme" title="Choose website theme">
+                    <option value="dark">Theme: Dark</option>
+                    <option value="light">Theme: Light</option>
+                    <option value="harvest">Theme: Harvest</option>
+                    <option value="forest">Theme: Forest</option>
+                    <option value="ocean">Theme: Ocean</option>
+                </select>
                 <button id="btn-lang" class="btn btn-subtle" title="Switch English / Hindi">EN / हिंदी</button>
                 <button id="btn-speak" class="btn btn-ghost" title="Read top priority alert aloud">Speak Alert</button>
                 <button id="btn-toggle-bg" class="btn btn-ghost" title="Toggle calm background motion">Motion: On</button>
@@ -215,58 +222,58 @@
                 <div class="xray-grid">
                     <svg id="machine-xray-svg" viewBox="0 0 680 230" class="xray-svg" role="img" aria-label="Interactive Tractor and Harvester Subsystem X-Ray Blueprint">
                         <!-- Subtle blueprint grid lines -->
-                        <line x1="20" y1="196" x2="660" y2="196" stroke="#2c2a25" stroke-width="1.5" />
-                        <line x1="40" y1="30" x2="640" y2="30" stroke="#22211d" stroke-width="1" stroke-dasharray="4 4" />
+                        <line x1="20" y1="196" x2="660" y2="196" stroke="var(--border-subtle)" stroke-width="1.5" />
+                        <line x1="40" y1="30" x2="640" y2="30" stroke="var(--bg-elevated)" stroke-width="1" stroke-dasharray="4 4" />
 
                         <!-- Chassis / Body Outline -->
                         <path d="M135 145 L135 88 L295 88 L335 46 L455 46 L472 95 L535 95 L548 145 Z"
-                              fill="#1b1a17" stroke="#4a463d" stroke-width="2" />
+                              fill="var(--bg-table-head)" stroke="var(--border-hover)" stroke-width="2" />
                         <!-- Operator Cab Window -->
                         <path d="M342 54 L446 54 L460 92 L322 92 Z"
-                              fill="#131311" stroke="#3c3932" stroke-width="1.5" />
+                              fill="var(--bg-inset)" stroke="var(--border-subtle)" stroke-width="1.5" />
                         <!-- Exhaust Stack -->
-                        <rect x="235" y="48" width="10" height="40" rx="2" fill="#2a2823" stroke="#4a463d" stroke-width="1.2" />
+                        <rect x="235" y="48" width="10" height="40" rx="2" fill="var(--bg-hover)" stroke="var(--border-hover)" stroke-width="1.2" />
 
                         <!-- Rear Large Drive Wheel -->
-                        <circle cx="430" cy="154" r="42" fill="#161513" stroke="#4a463d" stroke-width="2.5" />
-                        <circle cx="430" cy="154" r="20" fill="#1f1e1a" stroke="#3c3932" stroke-width="1.5" />
+                        <circle cx="430" cy="154" r="42" fill="var(--bg-panel)" stroke="var(--border-hover)" stroke-width="2.5" />
+                        <circle cx="430" cy="154" r="20" fill="var(--bg-secondary)" stroke="var(--border-subtle)" stroke-width="1.5" />
 
                         <!-- Front Wheel -->
-                        <circle cx="185" cy="166" r="30" fill="#161513" stroke="#4a463d" stroke-width="2.5" />
-                        <circle cx="185" cy="166" r="13" fill="#1f1e1a" stroke="#3c3932" stroke-width="1.5" />
+                        <circle cx="185" cy="166" r="30" fill="var(--bg-panel)" stroke="var(--border-hover)" stroke-width="2.5" />
+                        <circle cx="185" cy="166" r="13" fill="var(--bg-secondary)" stroke="var(--border-subtle)" stroke-width="1.5" />
 
                         <!-- SUBSYSTEM 1: COOLANT PUMP (Front Engine Bay) -->
                         <g class="xray-part" data-part="Coolant Pump" tabindex="0">
-                            <rect id="part-box-Coolant Pump" x="148" y="98" width="84" height="42" rx="4" fill="#25231e" stroke="#5c5850" stroke-width="1.8" />
-                            <text x="190" y="117" text-anchor="middle" fill="#f3efe6" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Coolant Pump</text>
-                            <text x="190" y="131" text-anchor="middle" fill="#a8a296" font-family="IBM Plex Mono, monospace" font-size="9.5">Engine Temp</text>
+                            <rect id="part-box-Coolant Pump" x="148" y="98" width="84" height="42" rx="4" fill="var(--bg-elevated)" stroke="var(--border-hover)" stroke-width="1.8" />
+                            <text x="190" y="117" text-anchor="middle" fill="var(--text-primary)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Coolant Pump</text>
+                            <text x="190" y="131" text-anchor="middle" fill="var(--text-secondary)" font-family="IBM Plex Mono, monospace" font-size="9.5">Engine Temp</text>
                         </g>
 
                         <!-- SUBSYSTEM 2: SENSOR HARNESS (Upper Telemetry Bus) -->
                         <g class="xray-part" data-part="Sensor Harness" tabindex="0">
-                            <rect id="part-box-Sensor Harness" x="248" y="96" width="96" height="36" rx="4" fill="#25231e" stroke="#5c5850" stroke-width="1.8" />
-                            <text x="296" y="112" text-anchor="middle" fill="#f3efe6" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Sensor Harness</text>
-                            <text x="296" y="125" text-anchor="middle" fill="#a8a296" font-family="IBM Plex Mono, monospace" font-size="9.5">CAN / Telemetry</text>
+                            <rect id="part-box-Sensor Harness" x="248" y="96" width="96" height="36" rx="4" fill="var(--bg-elevated)" stroke="var(--border-hover)" stroke-width="1.8" />
+                            <text x="296" y="112" text-anchor="middle" fill="var(--text-primary)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Sensor Harness</text>
+                            <text x="296" y="125" text-anchor="middle" fill="var(--text-secondary)" font-family="IBM Plex Mono, monospace" font-size="9.5">CAN / Telemetry</text>
                         </g>
 
                         <!-- SUBSYSTEM 3: HYDRAULIC VALVE (Mid-Rear Manifold) -->
                         <g class="xray-part" data-part="Hydraulic Valve" tabindex="0">
-                            <rect id="part-box-Hydraulic Valve" x="358" y="98" width="98" height="40" rx="4" fill="#25231e" stroke="#5c5850" stroke-width="1.8" />
-                            <text x="407" y="116" text-anchor="middle" fill="#f3efe6" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Hydraulic Valve</text>
-                            <text x="407" y="130" text-anchor="middle" fill="#a8a296" font-family="IBM Plex Mono, monospace" font-size="9.5">Oil Pressure</text>
+                            <rect id="part-box-Hydraulic Valve" x="358" y="98" width="98" height="40" rx="4" fill="var(--bg-elevated)" stroke="var(--border-hover)" stroke-width="1.8" />
+                            <text x="407" y="116" text-anchor="middle" fill="var(--text-primary)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Hydraulic Valve</text>
+                            <text x="407" y="130" text-anchor="middle" fill="var(--text-secondary)" font-family="IBM Plex Mono, monospace" font-size="9.5">Oil Pressure</text>
                         </g>
 
                         <!-- SUBSYSTEM 4: DRIVE BEARING (Rear Axle & PTO) -->
                         <g class="xray-part" data-part="Drive Bearing" tabindex="0">
-                            <rect id="part-box-Drive Bearing" x="470" y="106" width="94" height="42" rx="4" fill="#25231e" stroke="#5c5850" stroke-width="1.8" />
-                            <text x="517" y="124" text-anchor="middle" fill="#f3efe6" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Drive Bearing</text>
-                            <text x="517" y="138" text-anchor="middle" fill="#a8a296" font-family="IBM Plex Mono, monospace" font-size="9.5">Vibration / RPM</text>
+                            <rect id="part-box-Drive Bearing" x="470" y="106" width="94" height="42" rx="4" fill="var(--bg-elevated)" stroke="var(--border-hover)" stroke-width="1.8" />
+                            <text x="517" y="124" text-anchor="middle" fill="var(--text-primary)" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600">Drive Bearing</text>
+                            <text x="517" y="138" text-anchor="middle" fill="var(--text-secondary)" font-family="IBM Plex Mono, monospace" font-size="9.5">Vibration / RPM</text>
                         </g>
 
                         <!-- Connecting Telemetry Lines -->
-                        <line x1="232" y1="115" x2="248" y2="115" stroke="#5c5850" stroke-width="1.4" />
-                        <line x1="344" y1="115" x2="358" y2="115" stroke="#5c5850" stroke-width="1.4" />
-                        <line x1="456" y1="122" x2="470" y2="122" stroke="#5c5850" stroke-width="1.4" />
+                        <line x1="232" y1="115" x2="248" y2="115" stroke="var(--border-hover)" stroke-width="1.4" />
+                        <line x1="344" y1="115" x2="358" y2="115" stroke="var(--border-hover)" stroke-width="1.4" />
+                        <line x1="456" y1="122" x2="470" y2="122" stroke="var(--border-hover)" stroke-width="1.4" />
                     </svg>
 
                     <div id="xray-inspector-card" class="xray-inspector">

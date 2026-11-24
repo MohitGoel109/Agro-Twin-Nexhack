@@ -1,13 +1,13 @@
 /* Agro-Twin Interactive Flask Frontend: SVG X-Ray Blueprint, EN/हिंदी Voice, Weather Stress, Rupee ROI, SMS Cards & On-Topic AI Guide */
 
 const STATUS_META = {
-    HEALTHY: { label: "Healthy", labelHi: "स्वस्थ", color: "#4e7a5c", cls: "" },
-    SERVICED_READY: { label: "Serviced & ready", labelHi: "सर्विस पूर्ण", color: "#5b9a6f", cls: "saved" },
-    SERVICING: { label: "In service", labelHi: "सर्विस जारी", color: "#6e8898", cls: "saved" },
-    DATA_CHECK: { label: "Data hold", labelHi: "डेटा जांच", color: "#6e8898", cls: "hold" },
-    EARLY_WARNING: { label: "Early warning", labelHi: "प्रारंभिक चेतावनी", color: "#b87b28", cls: "urgent" },
-    CRITICAL_WARNING: { label: "Critical fault", labelHi: "गंभीर खराबी", color: "#d9534f", cls: "urgent" },
-    BROKEN_DOWN: { label: "Broken down", labelHi: "मशीन बंद", color: "#a83834", cls: "urgent" },
+    HEALTHY: { label: "Healthy", labelHi: "स्वस्थ", cls: "" },
+    SERVICED_READY: { label: "Serviced & ready", labelHi: "सर्विस पूर्ण", cls: "saved" },
+    SERVICING: { label: "In service", labelHi: "सर्विस जारी", cls: "saved" },
+    DATA_CHECK: { label: "Data hold", labelHi: "डेटा जांच", cls: "hold" },
+    EARLY_WARNING: { label: "Early warning", labelHi: "प्रारंभिक चेतावनी", cls: "urgent" },
+    CRITICAL_WARNING: { label: "Critical fault", labelHi: "गंभीर खराबी", cls: "urgent" },
+    BROKEN_DOWN: { label: "Broken down", labelHi: "मशीन बंद", cls: "urgent" },
 };
 
 const SENSOR_LABELS = {
@@ -64,7 +64,72 @@ const STATE = {
     fleet: null,
     health: null,
     bgMotionEnabled: true,
+    ambientColors: {
+        dot: "rgba(243, 239, 230, 0.035)",
+        line: "rgba(243, 239, 230, 0.04)",
+        accent: "rgba(229, 154, 50, 0.065)",
+    },
 };
+
+const THEMES = new Set(["dark", "light", "harvest", "forest", "ocean"]);
+
+function themeColor(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function statusColor(status) {
+    const colorByStatus = {
+        HEALTHY: "--chart-rpm",
+        SERVICED_READY: "--chart-rpm",
+        SERVICING: "--chart-oil",
+        DATA_CHECK: "--chart-oil",
+        EARLY_WARNING: "--chart-vibration",
+        CRITICAL_WARNING: "--accent-brick",
+        BROKEN_DOWN: "--accent-brick",
+    };
+    return themeColor(colorByStatus[status] || "--chart-muted");
+}
+
+function initThemeSelector() {
+    const selector = document.getElementById("theme-select");
+    if (!selector) return;
+
+    let savedTheme = "dark";
+    try {
+        const storedTheme = localStorage.getItem("agro-twin-theme");
+        if (THEMES.has(storedTheme)) savedTheme = storedTheme;
+    } catch (error) {
+        console.warn("Unable to read the saved theme preference.", error);
+    }
+
+    const applyTheme = (theme) => {
+        const selectedTheme = THEMES.has(theme) ? theme : "dark";
+        document.documentElement.dataset.theme = selectedTheme;
+        selector.value = selectedTheme;
+        STATE.ambientColors = {
+            dot: themeColor("--ambient-dot"),
+            line: themeColor("--ambient-line"),
+            accent: themeColor("--ambient-accent"),
+        };
+    };
+
+    applyTheme(savedTheme);
+    selector.addEventListener("change", () => {
+        const theme = selector.value;
+        applyTheme(theme);
+        try {
+            localStorage.setItem("agro-twin-theme", theme);
+        } catch (error) {
+            console.warn("Unable to save the theme preference.", error);
+        }
+
+        if (STATE.fleet) {
+            renderRiskChart(STATE.fleet.machines);
+            refreshTelemetry();
+            refreshComparison();
+        }
+    });
+}
 
 /* ---------------- 1. Calm Topographic Field Contour Background ---------------- */
 function initAmbientCanvas() {
@@ -88,7 +153,7 @@ function initAmbientCanvas() {
     function drawFrame() {
         ctx.clearRect(0, 0, width, height);
 
-        ctx.fillStyle = "rgba(243, 239, 230, 0.035)";
+        ctx.fillStyle = STATE.ambientColors.dot;
         const gap = 46;
         for (let x = 24; x < width; x += gap) {
             for (let y = 24; y < height; y += gap) {
@@ -101,9 +166,7 @@ function initAmbientCanvas() {
             ctx.beginPath();
             const baseY = (height / (lineCount + 1)) * (i + 1);
             const isAmber = i === 2 || i === 4;
-            ctx.strokeStyle = isAmber
-                ? "rgba(229, 154, 50, 0.065)"
-                : "rgba(243, 239, 230, 0.04)";
+            ctx.strokeStyle = isAmber ? STATE.ambientColors.accent : STATE.ambientColors.line;
             ctx.lineWidth = 1.1;
 
             for (let x = 0; x <= width; x += 28) {
@@ -330,7 +393,7 @@ function renderRiskChart(machines) {
     if (!el) return;
 
     if (!window.Plotly) {
-        el.innerHTML = `<div style="padding:16px;color:#a8a296;font-size:13px;">Offline chart fallback: ${machines
+        el.innerHTML = `<div style="padding:16px;color:var(--text-secondary);font-size:13px;">Offline chart fallback: ${machines
             .map((m) => `${m.machine_id}: ${(m.fault_probability * 100).toFixed(0)}% (±${(m.uncertainty * 100).toFixed(0)}%)`)
             .join(" | ")}</div>`;
         return;
@@ -340,11 +403,11 @@ function renderRiskChart(machines) {
     const y = machines.map((m) => Number((m.fault_probability * 100).toFixed(1)));
     const err = machines.map((m) => Number((m.uncertainty * 100).toFixed(1)));
     const colors = machines.map((m) => {
-        if (m.status === "CRITICAL_WARNING" || m.status === "BROKEN_DOWN") return "#e59a32";
-        if (m.status === "EARLY_WARNING") return "#b87b28";
-        if (m.status === "DATA_CHECK") return "#6e8898";
-        if (m.status === "SERVICED_READY" || m.status === "SERVICING") return "#5b9a6f";
-        return "#3f3d37";
+        if (m.status === "CRITICAL_WARNING" || m.status === "BROKEN_DOWN") return themeColor("--chart-temp");
+        if (m.status === "EARLY_WARNING") return themeColor("--chart-vibration");
+        if (m.status === "DATA_CHECK") return themeColor("--chart-oil");
+        if (m.status === "SERVICED_READY" || m.status === "SERVICING") return themeColor("--chart-rpm");
+        return themeColor("--chart-muted");
     });
     const hover = machines.map((m) => {
         const meta = STATUS_META[m.status] || { label: m.status };
@@ -364,10 +427,10 @@ function renderRiskChart(machines) {
         y,
         width: 0.5,
         marker: { color: colors },
-        error_y: { type: "data", array: err, visible: true, color: "#d6d0c4", thickness: 1.6, width: 5 },
+        error_y: { type: "data", array: err, visible: true, color: themeColor("--chart-text"), thickness: 1.6, width: 5 },
         text: y.map((v) => `${Math.round(v)}%`),
         textposition: "outside",
-        textfont: { family: "IBM Plex Mono, monospace", size: 11, color: "#f3efe6" },
+        textfont: { family: "IBM Plex Mono, monospace", size: 11, color: themeColor("--chart-title") },
         hovertext: hover,
         hoverinfo: "text",
     };
@@ -376,18 +439,18 @@ function renderRiskChart(machines) {
         title: {
             text: "Fault risk by unit with ensemble + missing-data uncertainty bands",
             x: 0,
-            font: { family: "IBM Plex Sans, sans-serif", size: 14, color: "#f3efe6" },
+            font: { family: "IBM Plex Sans, sans-serif", size: 14, color: themeColor("--chart-title") },
         },
-        paper_bgcolor: "#161513",
-        plot_bgcolor: "#161513",
-        font: { family: "IBM Plex Mono, monospace", size: 11, color: "#9c968a" },
+        paper_bgcolor: themeColor("--chart-paper"),
+        plot_bgcolor: themeColor("--chart-plot"),
+        font: { family: "IBM Plex Mono, monospace", size: 11, color: themeColor("--chart-text") },
         margin: { l: 48, r: 20, t: 48, b: 36 },
         height: 330,
-        xaxis: { showgrid: false, linecolor: "#2c2a25" },
-        yaxis: { title: "Risk (%)", range: [0, 118], gridcolor: "#26241f", zerolinecolor: "#2c2a25" },
+        xaxis: { showgrid: false, linecolor: themeColor("--chart-axis") },
+        yaxis: { title: "Risk (%)", range: [0, 118], gridcolor: themeColor("--chart-grid"), zerolinecolor: themeColor("--chart-axis") },
         shapes: [
-            { type: "line", x0: -0.5, x1: x.length - 0.5, y0: 70, y1: 70, line: { color: "#e59a32", width: 1.2, dash: "dot" } },
-            { type: "line", x0: -0.5, x1: x.length - 0.5, y0: 40, y1: 40, line: { color: "#5c5850", width: 1, dash: "dot" } },
+            { type: "line", x0: -0.5, x1: x.length - 0.5, y0: 70, y1: 70, line: { color: themeColor("--chart-temp"), width: 1.2, dash: "dot" } },
+            { type: "line", x0: -0.5, x1: x.length - 0.5, y0: 40, y1: 40, line: { color: themeColor("--chart-muted"), width: 1, dash: "dot" } },
         ],
     };
 
@@ -399,7 +462,8 @@ function renderFleetCards(fleet) {
     grid.innerHTML = "";
 
     fleet.machines.forEach((m, idx) => {
-        const meta = STATUS_META[m.status] || { label: m.status, labelHi: m.status, color: "#524f47", cls: "" };
+        const meta = STATUS_META[m.status] || { label: m.status, labelHi: m.status, cls: "" };
+        const color = statusColor(m.status);
         const machineId = escapeHtml(m.machine_id);
         const machineName = escapeHtml(m.name);
         const partNeeded = escapeHtml(m.part_needed);
@@ -437,11 +501,11 @@ function renderFleetCards(fleet) {
                     <span class="unit-id">${machineId}</span>
                     <span class="unit-name">${machineName}</span>
                 </div>
-                <span class="status-tag" style="background:${meta.color};">${badgeText}</span>
+                <span class="status-tag" style="background:${color};">${badgeText}</span>
             </div>
             <div class="unit-summary">${unitHeadline(m, fleet.step)}</div>
             <div class="risk-meter">
-                <div class="risk-meter-fill" style="width:${riskPct}%; background:${meta.color};"></div>
+                <div class="risk-meter-fill" style="width:${riskPct}%; background:${color};"></div>
             </div>
             <div class="unit-metrics">
                 Risk ${riskPct}% (±${uncPct}%) &nbsp;|&nbsp; Confidence ${confPct}% &nbsp;|&nbsp; ${feedLabel}${ackTag}
@@ -492,7 +556,7 @@ function renderFleetCards(fleet) {
 function renderPriorityQueue(fleet) {
     const tbody = document.getElementById("priority-tbody");
     if (!fleet.priority_queue.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="color:#787368;">No units require urgent maintenance at Hour ${fleet.step}.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="color:var(--text-muted);">No units require urgent maintenance at Hour ${fleet.step}.</td></tr>`;
         return;
     }
 
@@ -504,11 +568,11 @@ function renderPriorityQueue(fleet) {
                     <td style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(p.machine_id)}</td>
                     <td>${escapeHtml(p.name)}</td>
                     <td>${escapeHtml(meta.label)}</td>
-                    <td style="font-family:'IBM Plex Mono',monospace;color:#e59a32;">${p.priority_score}</td>
+                    <td style="font-family:'IBM Plex Mono',monospace;color:var(--accent-amber);">${p.priority_score}</td>
                     <td style="font-family:'IBM Plex Mono',monospace;">${Math.round(p.fault_probability * 100)}%</td>
                     <td style="font-family:'IBM Plex Mono',monospace;">${Math.round(p.confidence * 100)}%</td>
                     <td>${escapeHtml(p.part_needed)} (${p.part_in_stock})</td>
-                    <td style="color:#a8a296;">${escapeHtml(p.recommended_action)}</td>
+                    <td style="color:var(--text-secondary);">${escapeHtml(p.recommended_action)}</td>
                 </tr>
             `;
         })
@@ -518,7 +582,7 @@ function renderPriorityQueue(fleet) {
 function renderWorkOrdersAndLog(fleet) {
     const woBody = document.getElementById("wo-tbody");
     if (!fleet.work_orders.length) {
-        woBody.innerHTML = `<tr><td colspan="7" style="color:#787368;">No work orders yet. Schedule a 4-hour service on TR-101 in Segment 01 to generate an SMS Job Card.</td></tr>`;
+        woBody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted);">No work orders yet. Schedule a 4-hour service on TR-101 in Segment 01 to generate an SMS Job Card.</td></tr>`;
     } else {
         woBody.innerHTML = fleet.work_orders
             .map(
@@ -527,11 +591,11 @@ function renderWorkOrdersAndLog(fleet) {
                     <td style="font-family:'IBM Plex Mono',monospace;">${w.wo_id}</td>
                     <td>${escapeHtml(w.machine_id)} — ${escapeHtml(w.machine_name)}</td>
                     <td>${escapeHtml(w.part_needed)}</td>
-                    <td style="font-family:'IBM Plex Mono',monospace;color:#e59a32;">${escapeHtml(w.status)}</td>
+                    <td style="font-family:'IBM Plex Mono',monospace;color:var(--accent-amber);">${escapeHtml(w.status)}</td>
                     <td style="font-family:'IBM Plex Mono',monospace;">${
                         w.scheduled_start !== null ? `Hr ${w.scheduled_start}–${w.completion_step}` : "Deferred"
                     }</td>
-                    <td style="color:#a8a296;">${escapeHtml(w.reason || w.cancellation_reason || "")}</td>
+                    <td style="color:var(--text-secondary);">${escapeHtml(w.reason || w.cancellation_reason || "")}</td>
                     <td>${w.status !== "CANCELLED" ? `<button class="btn btn-subtle" data-sms-unit="${escapeHtml(w.machine_id)}">View SMS Card</button>` : "—"}</td>
                 </tr>
             `
@@ -553,7 +617,7 @@ function renderWorkOrdersAndLog(fleet) {
                 const stepStr = e.step !== undefined && e.step !== null ? `[Hr ${escapeHtml(e.step)}] ` : "";
                 const target = e.machine_id ? ` · ${escapeHtml(e.machine_id)}` : "";
                 const wo = e.wo_id ? ` · ${escapeHtml(e.wo_id)}` : "";
-                return `<div class="audit-item">${stepStr}<strong style="color:#f3efe6;">${escapeHtml(e.event)}</strong>${target}${wo}</div>`;
+                return `<div class="audit-item">${stepStr}<strong style="color:var(--text-primary);">${escapeHtml(e.event)}</strong>${target}${wo}</div>`;
             })
             .join("");
     }
@@ -590,25 +654,25 @@ function updateXrayBlueprint(machine, focusPart = null) {
         const isTarget = pName === targetPart;
         if (isTarget) {
             if (machine.status === "CRITICAL_WARNING" || machine.status === "EARLY_WARNING" || machine.status === "BROKEN_DOWN") {
-                box.setAttribute("fill", "rgba(229, 154, 50, 0.24)");
-                box.setAttribute("stroke", "#e59a32");
+                box.setAttribute("fill", "var(--bg-elevated)");
+                box.setAttribute("stroke", "var(--accent-amber)");
                 box.setAttribute("stroke-width", "2.4");
             } else if (machine.status === "DATA_CHECK") {
-                box.setAttribute("fill", "rgba(110, 136, 152, 0.24)");
-                box.setAttribute("stroke", "#6e8898");
+                box.setAttribute("fill", "var(--bg-elevated)");
+                box.setAttribute("stroke", "var(--chart-oil)");
                 box.setAttribute("stroke-width", "2.2");
             } else if (machine.status === "SERVICED_READY" || machine.status === "SERVICING") {
-                box.setAttribute("fill", "rgba(91, 154, 111, 0.22)");
-                box.setAttribute("stroke", "#5b9a6f");
+                box.setAttribute("fill", "var(--bg-elevated)");
+                box.setAttribute("stroke", "var(--chart-rpm)");
                 box.setAttribute("stroke-width", "2.2");
             } else {
-                box.setAttribute("fill", "#2a2822");
-                box.setAttribute("stroke", "#a8a296");
+                box.setAttribute("fill", "var(--bg-elevated)");
+                box.setAttribute("stroke", "var(--text-secondary)");
                 box.setAttribute("stroke-width", "2");
             }
         } else {
-            box.setAttribute("fill", "#1d1c18");
-            box.setAttribute("stroke", "#444139");
+            box.setAttribute("fill", "var(--bg-subtle)");
+            box.setAttribute("stroke", "var(--border-hover)");
             box.setAttribute("stroke-width", "1.4");
         }
     });
@@ -656,36 +720,36 @@ async function refreshTelemetry() {
 
     const el = document.getElementById("chart-telemetry");
     if (!window.Plotly) {
-        el.innerHTML = `<div style="padding:16px;color:#a8a296;">Telemetry points loaded: ${detail.history.length} hours for ${unitId}.</div>`;
+        el.innerHTML = `<div style="padding:16px;color:var(--text-secondary);">Telemetry points loaded: ${detail.history.length} hours for ${unitId}.</div>`;
         return;
     }
 
     const hist = detail.history;
     const steps = hist.map((h) => h.step);
     const traces = [
-        { x: steps, y: hist.map((h) => h.engine_temp), name: "Engine Temp (C)", mode: "lines+markers", line: { color: "#e59a32", width: 2 }, marker: { size: 3.5 }, connectgaps: false, xaxis: "x", yaxis: "y" },
-        { x: steps, y: hist.map((h) => h.vibration), name: "Vibration (mm/s)", mode: "lines+markers", line: { color: "#d97736", width: 2 }, marker: { size: 3.5 }, connectgaps: false, xaxis: "x2", yaxis: "y2" },
-        { x: steps, y: hist.map((h) => h.oil_pressure), name: "Oil Pressure (PSI)", mode: "lines+markers", line: { color: "#6e8898", width: 2 }, marker: { size: 3.5 }, connectgaps: false, xaxis: "x3", yaxis: "y3" },
-        { x: steps, y: hist.map((h) => h.rpm_variance), name: "RPM Variance (RPM)", mode: "lines+markers", line: { color: "#5b9a6f", width: 2 }, marker: { size: 3.5 }, connectgaps: false, xaxis: "x4", yaxis: "y4" },
+        { x: steps, y: hist.map((h) => h.engine_temp), name: "Engine Temp (C)", mode: "lines+markers", line: { color: themeColor("--chart-temp"), width: 2 }, marker: { size: 3.5 }, connectgaps: false, xaxis: "x", yaxis: "y" },
+        { x: steps, y: hist.map((h) => h.vibration), name: "Vibration (mm/s)", mode: "lines+markers", line: { color: themeColor("--chart-vibration"), width: 2 }, marker: { size: 3.5 }, connectgaps: false, xaxis: "x2", yaxis: "y2" },
+        { x: steps, y: hist.map((h) => h.oil_pressure), name: "Oil Pressure (PSI)", mode: "lines+markers", line: { color: themeColor("--chart-oil"), width: 2 }, marker: { size: 3.5 }, connectgaps: false, xaxis: "x3", yaxis: "y3" },
+        { x: steps, y: hist.map((h) => h.rpm_variance), name: "RPM Variance (RPM)", mode: "lines+markers", line: { color: themeColor("--chart-rpm"), width: 2 }, marker: { size: 3.5 }, connectgaps: false, xaxis: "x4", yaxis: "y4" },
     ];
 
     const layout = {
         title: {
             text: `Raw hourly telemetry — ${unitId} (gaps = missing readings, baseline dashed)`,
             x: 0,
-            font: { family: "IBM Plex Sans, sans-serif", size: 14, color: "#f3efe6" },
+            font: { family: "IBM Plex Sans, sans-serif", size: 14, color: themeColor("--chart-title") },
         },
         grid: { rows: 2, columns: 2, pattern: "independent", roworder: "top to bottom" },
-        paper_bgcolor: "#161513",
-        plot_bgcolor: "#161513",
-        font: { family: "IBM Plex Mono, monospace", size: 10, color: "#9c968a" },
+        paper_bgcolor: themeColor("--chart-paper"),
+        plot_bgcolor: themeColor("--chart-plot"),
+        font: { family: "IBM Plex Mono, monospace", size: 10, color: themeColor("--chart-text") },
         height: 430,
         showlegend: false,
         margin: { l: 48, r: 20, t: 54, b: 36 },
-        yaxis: { title: "Temp (C)", gridcolor: "#26241f" },
-        yaxis2: { title: "Vib (mm/s)", gridcolor: "#26241f" },
-        yaxis3: { title: "Oil (PSI)", gridcolor: "#26241f" },
-        yaxis4: { title: "RPM Var", gridcolor: "#26241f" },
+        yaxis: { title: "Temp (C)", gridcolor: themeColor("--chart-grid") },
+        yaxis2: { title: "Vib (mm/s)", gridcolor: themeColor("--chart-grid") },
+        yaxis3: { title: "Oil (PSI)", gridcolor: themeColor("--chart-grid") },
+        yaxis4: { title: "RPM Var", gridcolor: themeColor("--chart-grid") },
         xaxis: { showgrid: false },
         xaxis2: { showgrid: false },
         xaxis3: { showgrid: false, title: "Harvest hour" },
@@ -738,16 +802,16 @@ async function refreshComparison() {
             y: comp.hourly_series.map((p) => p.calendar_availability_pct),
             name: "Calendar-only",
             mode: "lines",
-            line: { color: "#8c867a", width: 2, dash: "dash" },
+            line: { color: themeColor("--chart-calendar"), width: 2, dash: "dash" },
         },
         {
             x: steps,
             y: comp.hourly_series.map((p) => p.ai_twin_availability_pct),
             name: "Agro-Twin AI",
             mode: "lines",
-            line: { color: "#e59a32", width: 2.8 },
+            line: { color: themeColor("--chart-temp"), width: 2.8 },
             fill: "tonexty",
-            fillcolor: "rgba(229, 154, 50, 0.12)",
+            fillcolor: themeColor("--chart-accent-soft"),
         },
     ];
 
@@ -755,14 +819,14 @@ async function refreshComparison() {
         "chart-compare-avail",
         availTraces,
         {
-            title: { text: "Hourly availability (120h harvest)", x: 0, font: { family: "IBM Plex Sans, sans-serif", size: 14, color: "#f3efe6" } },
-            paper_bgcolor: "#161513",
-            plot_bgcolor: "#161513",
-            font: { family: "IBM Plex Mono, monospace", size: 11, color: "#9c968a" },
+            title: { text: "Hourly availability (120h harvest)", x: 0, font: { family: "IBM Plex Sans, sans-serif", size: 14, color: themeColor("--chart-title") } },
+            paper_bgcolor: themeColor("--chart-paper"),
+            plot_bgcolor: themeColor("--chart-plot"),
+            font: { family: "IBM Plex Mono, monospace", size: 11, color: themeColor("--chart-text") },
             height: 330,
             margin: { l: 48, r: 16, t: 50, b: 40 },
             xaxis: { title: "Harvest hour", showgrid: false },
-            yaxis: { title: "Available (%)", range: [45, 105], gridcolor: "#26241f" },
+            yaxis: { title: "Available (%)", range: [45, 105], gridcolor: themeColor("--chart-grid") },
             legend: { orientation: "h", y: 1.12, x: 1, xanchor: "right" },
         },
         { displayModeBar: false, responsive: true }
@@ -775,7 +839,7 @@ async function refreshComparison() {
             name: "Calendar-only",
             x: barCats,
             y: [cal.total_downtime_hours, cal.unplanned_breakdowns, cal.avg_warning_lead_time_hours],
-            marker: { color: "#524f47" },
+            marker: { color: themeColor("--chart-calendar") },
             text: [`${cal.total_downtime_hours}h`, `${cal.unplanned_breakdowns}`, `${cal.avg_warning_lead_time_hours}h`],
             textposition: "outside",
         },
@@ -784,7 +848,7 @@ async function refreshComparison() {
             name: "Agro-Twin AI",
             x: barCats,
             y: [ai.total_downtime_hours, ai.unplanned_breakdowns, ai.avg_warning_lead_time_hours],
-            marker: { color: "#e59a32" },
+            marker: { color: themeColor("--chart-temp") },
             text: [`${ai.total_downtime_hours}h`, `${ai.unplanned_breakdowns}`, `${ai.avg_warning_lead_time_hours}h`],
             textposition: "outside",
         },
@@ -794,15 +858,15 @@ async function refreshComparison() {
         "chart-compare-bar",
         barTraces,
         {
-            title: { text: "Measured outcome comparison", x: 0, font: { family: "IBM Plex Sans, sans-serif", size: 14, color: "#f3efe6" } },
+            title: { text: "Measured outcome comparison", x: 0, font: { family: "IBM Plex Sans, sans-serif", size: 14, color: themeColor("--chart-title") } },
             barmode: "group",
-            paper_bgcolor: "#161513",
-            plot_bgcolor: "#161513",
-            font: { family: "IBM Plex Mono, monospace", size: 11, color: "#9c968a" },
+            paper_bgcolor: themeColor("--chart-paper"),
+            plot_bgcolor: themeColor("--chart-plot"),
+            font: { family: "IBM Plex Mono, monospace", size: 11, color: themeColor("--chart-text") },
             height: 330,
             margin: { l: 44, r: 16, t: 50, b: 40 },
             xaxis: { showgrid: false },
-            yaxis: { gridcolor: "#26241f" },
+            yaxis: { gridcolor: themeColor("--chart-grid") },
             legend: { orientation: "h", y: 1.12, x: 1, xanchor: "right" },
         },
         { displayModeBar: false, responsive: true }
@@ -1202,6 +1266,7 @@ function initAssistantDrawer() {
 
 /* ---------------- Boot Application ---------------- */
 window.addEventListener("DOMContentLoaded", async () => {
+    initThemeSelector();
     initAmbientCanvas();
     initRevealAndSegments();
     initControls();

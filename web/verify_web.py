@@ -44,9 +44,21 @@ def run_verification():
         "fleet-manager-criticality",
         "btn-save-machine",
         "btn-delete-machine",
+        "theme-select",
     ]:
         assert token in html_src, f"Missing UI element in index.html: {token}"
-    print("[CHECK 2] SVG X-Ray, language/voice, weather/ROI/SMS/webhook, and fleet manager UI verified.")
+    css_path = os.path.join(REPO_ROOT, "web", "static", "css", "style.css")
+    js_path = os.path.join(REPO_ROOT, "web", "static", "js", "app.js")
+    with open(css_path, "r", encoding="utf-8") as f:
+        css_src = f.read()
+    with open(js_path, "r", encoding="utf-8") as f:
+        js_src = f.read()
+    assert ":root {" in css_src, "Missing default dark theme palette."
+    for theme in ["light", "harvest", "forest", "ocean"]:
+        assert f'data-theme="{theme}"' in css_src, f"Missing {theme} theme palette."
+        assert f'value="{theme}"' in html_src, f"Missing {theme} theme option."
+    assert "localStorage.setItem(\"agro-twin-theme\"" in js_src
+    print("[CHECK 2] SVG X-Ray, language/voice, weather/ROI/SMS/webhook, fleet manager, and five themes verified.")
 
     # 3. Verify AI Assistant answers all website + new feature queries accurately
     twin = TwinStateManager(num_steps=120, technicians_total=2)
