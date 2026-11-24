@@ -26,11 +26,27 @@ def run_verification():
     print("AGRO-TWIN | MEMBER 4 (SHASHI) FRONTEND & FULL-STACK VERIFICATION")
     print("=" * 74)
 
-    # 1. Verify dashboard.py syntax is 100% clean
-    dash_path = os.path.join(REPO_ROOT, "frontend", "dashboard.py")
-    with open(dash_path, "r", encoding="utf-8") as f:
-        ast.parse(f.read(), filename=dash_path)
-    print("[CHECK 1] frontend/dashboard.py syntax valid.")
+    # 1. Verify the app entry point and every page script parse cleanly
+    frontend_dir = os.path.join(REPO_ROOT, "frontend")
+    page_dir = os.path.join(frontend_dir, "app_pages")
+    expected_pages = {
+        "fleet.py",
+        "telemetry.py",
+        "performance.py",
+        "work_orders.py",
+        "operations.py",
+    }
+    page_files = sorted(name for name in os.listdir(page_dir) if name.endswith(".py"))
+    assert expected_pages.issubset(page_files), "One or more dashboard pages are missing."
+    source_files = [
+        os.path.join(frontend_dir, "dashboard.py"),
+        os.path.join(frontend_dir, "dashboard_shared.py"),
+        *(os.path.join(page_dir, name) for name in page_files),
+    ]
+    for source_path in source_files:
+        with open(source_path, "r", encoding="utf-8") as source_file:
+            ast.parse(source_file.read(), filename=source_path)
+    print(f"[CHECK 1] {len(source_files)} Streamlit dashboard scripts parse cleanly.")
 
     # 2. Initialize smart dual-mode client (auto-detects FastAPI or offline-safe local twin)
     client = AgroTwinClient(timeout=0.5)

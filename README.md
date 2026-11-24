@@ -84,7 +84,9 @@ Measured directly by `ops/verify_ops.py` on identical fleet telemetry:
     ├── __init__.py
     ├── api_client.py          # Dual-mode API client (FastAPI + offline-safe local fallback)
     ├── charts.py              # Interactive Plotly visualizations
-    ├── dashboard.py           # 4-tab Streamlit Digital Twin command center
+    ├── dashboard.py           # Multi-page command center with five selectable themes
+    ├── dashboard_shared.py    # Shared state and presentation helpers
+    ├── app_pages/             # Fleet, telemetry, performance, work orders, operations
     └── verify_frontend.py     # Full-stack end-to-end verification across all 4 modules
 ```
 
