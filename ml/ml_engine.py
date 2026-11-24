@@ -89,6 +89,7 @@ def _generate_single_machine(
     mode: str = "healthy",
     fault_start: int = None,
     num_steps: int = 120,
+    weather_mode: str = "normal",
 ) -> pd.DataFrame:
     """Generates hourly synthetic telemetry for one fictional farm machine."""
     rng = np.random.default_rng(seed)
@@ -98,6 +99,11 @@ def _generate_single_machine(
     oil_pressure = rng.normal(BASELINES["oil_pressure"], 1.3, num_steps)
     rpm_variance = rng.normal(BASELINES["rpm_variance"], 2.0, num_steps)
 
+    heatwave = weather_mode == "heatwave_45c"
+    if heatwave:
+        engine_temp += 8.0
+        oil_pressure -= 2.5
+
     breakdown_step = None
 
     # Gradual developing faults over ~20-24 hours before breakdown
@@ -105,26 +111,32 @@ def _generate_single_machine(
         breakdown_step = min(fault_start + 22, num_steps - 1)
         for t in range(fault_start, num_steps):
             age = t - fault_start
-            engine_temp[t] += 1.15 * age
-            oil_pressure[t] -= 0.85 * age
-            vibration[t] += 0.10 * age
-            rpm_variance[t] += 1.40 * age
+            slope = 1.25 if heatwave else 1.0
+            engine_temp[t] += 1.15 * age * slope
+            oil_pressure[t] -= 0.85 * age * slope
+            vibration[t] += 0.10 * age * slope
+            rpm_variance[t] += 1.40 * age * slope
 
     elif mode == "fault_hydraulic" and fault_start is not None:
         breakdown_step = min(fault_start + 24, num_steps - 1)
         for t in range(fault_start, num_steps):
             age = t - fault_start
-            oil_pressure[t] -= 1.05 * age
-            vibration[t] += 0.16 * age
-            engine_temp[t] += 0.65 * age
+            slope = 1.25 if heatwave else 1.0
+            oil_pressure[t] -= 1.05 * age * slope
+            vibration[t] += 0.16 * age * slope
+            engine_temp[t] += 0.65 * age * slope
 
     elif mode == "fault_bearing" and fault_start is not None:
         breakdown_step = min(fault_start + 20, num_steps - 1)
         for t in range(fault_start, num_steps):
             age = t - fault_start
-            vibration[t] += 0.24 * age
-            rpm_variance[t] += 2.10 * age
-            engine_temp[t] += 0.45 * age
+            slope = 1.25 if heatwave else 1.0
+            vibration[t] += 0.24 * age * slope
+            rpm_variance[t] += 2.10 * age * slope
+            engine_temp[t] += 0.45 * age * slope
+
+    if heatwave and breakdown_step is not None:
+        breakdown_step = max(fault_start + 12, breakdown_step - 4)
 
     # Isolated 1-hour sensor spikes (noise, NOT real machine degradation)
     if mode == "noisy":
@@ -203,6 +215,7 @@ class FleetTelemetryEngine:
 
     def __init__(self, num_steps: int = 120):
         self.num_steps = num_steps
+        self.weather_mode = "normal"
         self.model = None
         self.fleet_meta = [dict(m) for m in DEFAULT_FLEET_META]
         self.telemetry = {}
@@ -265,6 +278,7 @@ class FleetTelemetryEngine:
                 mode=m["mode"],
                 fault_start=m["fault_start"],
                 num_steps=self.num_steps,
+                weather_mode=self.weather_mode,
             )
             self.telemetry[m["id"]] = df
             self.features[m["id"]] = _extract_leak_free_features(df)
@@ -272,7 +286,25 @@ class FleetTelemetryEngine:
     def reset_fleet(self):
         """Resets all machines back to the default deterministic harvest scenario."""
         self.fleet_meta = [dict(m) for m in DEFAULT_FLEET_META]
+        self.weather_mode = "normal"
         self._build_fleet_data()
+
+    def set_weather_mode(self, mode: str) -> dict:
+        """Switches the fleet between normal weather and severe harvest heat."""
+        self.weather_mode = (
+            mode if isinstance(mode, str) and mode in {"normal", "heatwave_45c"} else "normal"
+        )
+        self._build_fleet_data()
+        return {
+            "ok": True,
+            "weather_mode": self.weather_mode,
+            "ambient_temp_c": 45 if self.weather_mode == "heatwave_45c" else 30,
+            "stress_note": (
+                "45°C harvest heat raises engine temperatures and tightens fault lead times."
+                if self.weather_mode == "heatwave_45c"
+                else "Normal 30°C operating conditions."
+            ),
+        }
 
     def get_all_machine_ids(self) -> list:
         """Returns the list of all machine IDs in the fleet."""
@@ -289,6 +321,7 @@ class FleetTelemetryEngine:
             "uncertainty_method": "Ensemble tree disagreement (std across 50 trees) + missing-telemetry & spike penalties.",
             "fleet_size": len(self.fleet_meta),
             "simulation_hours": self.num_steps,
+            "weather_mode": self.weather_mode,
         }
 
     def inject_fault(
@@ -308,6 +341,7 @@ class FleetTelemetryEngine:
                     mode=fault_type,
                     fault_start=int(start_step),
                     num_steps=self.num_steps,
+                    weather_mode=self.weather_mode,
                 )
                 self.telemetry[machine_id] = df
                 self.features[machine_id] = _extract_leak_free_features(df)
@@ -418,6 +452,7 @@ class FleetTelemetryEngine:
                     "name": m["name"],
                     "type": m["type"],
                     "step": step,
+                    "weather_mode": self.weather_mode,
                     "status": status,
                     "sensor_status": sensor_status,
                     "fault_probability": round(fault_prob, 3),

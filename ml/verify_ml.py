@@ -52,6 +52,23 @@ def run_verification():
     assert after["fault_probability"] >= 0.40, "Injected fault should raise risk score"
 
     engine.reset_fleet()
+    print("\n[TEST 3] Heatwave Weather Stress Check:")
+    normal = {m["machine_id"]: m for m in engine.get_fleet_snapshot(step=35)}["TR-101"]
+    heatwave_result = engine.set_weather_mode("heatwave_45c")
+    heatwave = {m["machine_id"]: m for m in engine.get_fleet_snapshot(step=35)}["TR-101"]
+    assert heatwave_result["ok"], "Heatwave mode should be enabled"
+    assert heatwave["actual_breakdown_step"] < normal["actual_breakdown_step"], "Heatwave should shift TR-101 breakdown earlier"
+    assert heatwave["raw_sensors"]["engine_temp"] > normal["raw_sensors"]["engine_temp"], "Heatwave should raise TR-101 engine temperature"
+    assert heatwave["weather_mode"] == "heatwave_45c", "Machine snapshot should report active weather mode"
+    print(
+        f"  TR-101 | normal breakdown Hour {normal['actual_breakdown_step']} -> "
+        f"heatwave Hour {heatwave['actual_breakdown_step']} | "
+        f"Engine {normal['raw_sensors']['engine_temp']:.1f}°C -> "
+        f"{heatwave['raw_sensors']['engine_temp']:.1f}°C"
+    )
+    engine.set_weather_mode("normal")
+    assert engine.get_model_info()["weather_mode"] == "normal", "Switching back should restore normal weather"
+
     print("\nALL CHECKS PASSED! Member 1 (Vansh) module is 100% ready for Kunal, Mohit, and Shashi.")
     print("=" * 72)
 
