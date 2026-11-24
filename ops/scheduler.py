@@ -5,7 +5,11 @@ Problem Statement 08: Predictive Maintenance Twin for Farm Machinery
 """
 
 from copy import deepcopy
-from ml.ml_engine import FleetTelemetryEngine
+
+try:
+    from ml.ml_engine import FleetTelemetryEngine
+except ModuleNotFoundError:  # pragma: no cover - allows test injection when ml is unavailable
+    FleetTelemetryEngine = None
 
 # Operational constants (hours)
 PREVENTIVE_SERVICE_HOURS = 4       # Short planned service when fault is caught early
@@ -573,6 +577,81 @@ class FleetOperationsScheduler:
                 "avg_warning_lead_time_hours": avg_lead_time,
             },
             "hourly_series": hourly_series,
+        }
+
+    def compute_roi_summary(
+        self,
+        hourly_loss_inr: float = 2500.0,
+        preventive_part_cost_inr: float = 2200.0,
+        calendar_interval: int = 72,
+    ) -> dict:
+        """
+        Translates downtime savings into estimated Indian Rupee (INR) harvest protection.
+        """
+        comp = self.compare_against_calendar_baseline(calendar_interval=calendar_interval)
+        downtime_hours_saved = comp["improvement"]["downtime_hours_saved"]
+        preventive_services = comp["ai_twin"]["preventive_services_completed"]
+        gross_harvest_protected_inr = round(downtime_hours_saved * float(hourly_loss_inr), 2)
+        preventive_spend_inr = round(preventive_services * float(preventive_part_cost_inr), 2)
+        net_savings_inr = round(gross_harvest_protected_inr - preventive_spend_inr, 2)
+        roi_multiple = round(gross_harvest_protected_inr / max(1.0, preventive_spend_inr), 1)
+        return {
+            "downtime_hours_saved": downtime_hours_saved,
+            "preventive_services": preventive_services,
+            "gross_harvest_protected_inr": gross_harvest_protected_inr,
+            "preventive_spend_inr": preventive_spend_inr,
+            "net_savings_inr": net_savings_inr,
+            "roi_multiple": roi_multiple,
+            "hourly_loss_inr": float(hourly_loss_inr),
+            "preventive_part_cost_inr": float(preventive_part_cost_inr),
+            "breakdowns_avoided": comp["improvement"]["breakdowns_avoided"],
+        }
+
+    def generate_sms_job_card(self, machine_id: str, current_step: int) -> dict:
+        """
+        Generates a low-bandwidth mechanic dispatch SMS card in English and Hindi.
+        """
+        state = self.get_operational_fleet_state(current_step)
+        machine = next((m for m in state["machines"] if m["machine_id"] == machine_id), None)
+        if machine is None:
+            return {"ok": False, "message": "Unknown machine_id"}
+
+        risk_pct = int(round(machine.get("fault_probability", 0.0) * 100))
+        part_needed = machine.get("part_needed", "Part")
+        machine_name = machine.get("name", machine_id)
+        status = machine.get("status", "UNKNOWN")
+        open_wo = machine.get("open_work_order") or {}
+        wo_id = open_wo.get("wo_id", "")
+
+        sms_en = (
+            f"AGRO-TWIN: {machine_id} {part_needed} | Risk {risk_pct}% | "
+            f"4h preventive bay slot | Prevents 18h breakdown"
+        )
+        if len(sms_en) > 160:
+            sms_en = sms_en[:157] + "..."
+
+        sms_hi = (
+            f"एग्रो-ट्विन: {machine_id} {part_needed} | जोखिम {risk_pct}% | "
+            f"4 घंटे की निवारक सेवा करें | 18 घंटे का ब्रेकडाउन रोकें"
+        )
+
+        checklist = [
+            f"Inspect {part_needed} for wear, leaks, or damage.",
+            "Verify sensor readings and error indicators are stable.",
+            "Complete 4-hour preventive service and replace faulty parts if needed.",
+            "Run a short test cycle and confirm machine is ready for field work.",
+        ]
+
+        return {
+            "ok": True,
+            "machine_id": machine_id,
+            "machine_name": machine_name,
+            "part_needed": part_needed,
+            "status": status,
+            "wo_id": wo_id,
+            "sms_en": sms_en,
+            "sms_hi": sms_hi,
+            "checklist": checklist,
         }
 
 
