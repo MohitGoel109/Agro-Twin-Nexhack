@@ -67,7 +67,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------------- Session State Initialization ----------------
+# ---------------- Session State Initialization & Callbacks ----------------
 
 if "client" not in st.session_state:
     st.session_state.client = AgroTwinClient()
@@ -77,6 +77,21 @@ if "flash_msg" not in st.session_state:
     st.session_state.flash_msg = None
 
 client: AgroTwinClient = st.session_state.client
+
+
+def _set_step(val: int):
+    st.session_state.current_step = max(0, min(119, int(val)))
+
+
+def _shift_step(delta: int):
+    st.session_state.current_step = max(0, min(119, int(st.session_state.current_step) + int(delta)))
+
+
+def _reset_demo():
+    st.session_state.client.reset()
+    st.session_state.current_step = 35
+    st.session_state.flash_msg = ("success", "Demo reset cleanly! Ready for next pitch.")
+
 
 # ---------------- Sidebar: Replay, Scarcity & Fault Injection ----------------
 
@@ -91,40 +106,26 @@ with st.sidebar:
     st.divider()
     st.subheader("⏱️ Harvest Timeline Replay")
 
-    step = st.slider(
+    # Bound directly to session_state.current_step so jump buttons & slider stay 100% synced
+    st.slider(
         "Simulation Hour (0 - 119)",
         min_value=0,
         max_value=119,
-        value=st.session_state.current_step,
-        key="step_slider",
+        key="current_step",
     )
-    if step != st.session_state.current_step:
-        st.session_state.current_step = step
 
     c_prev, c_next = st.columns(2)
-    if c_prev.button("◀ -1 hr", use_container_width=True):
-        st.session_state.current_step = max(0, st.session_state.current_step - 1)
-        st.rerun()
-    if c_next.button("+1 hr ▶", use_container_width=True):
-        st.session_state.current_step = min(119, st.session_state.current_step + 1)
-        st.rerun()
+    c_prev.button("◀ -1 hr", use_container_width=True, on_click=_shift_step, args=(-1,))
+    c_next.button("+1 hr ▶", use_container_width=True, on_click=_shift_step, args=(1,))
 
     st.caption("Quick Judge Demo Jump Points:")
     j1, j2 = st.columns(2)
-    if j1.button("Hr 35: Fault+Noise", use_container_width=True):
-        st.session_state.current_step = 35
-        st.rerun()
-    if j2.button("Hr 48: Saved!", use_container_width=True):
-        st.session_state.current_step = 48
-        st.rerun()
+    j1.button("Hr 35: Fault+Noise", use_container_width=True, on_click=_set_step, args=(35,))
+    j2.button("Hr 48: Saved!", use_container_width=True, on_click=_set_step, args=(48,))
 
     j3, j4 = st.columns(2)
-    if j3.button("Hr 55: Multi-Risk", use_container_width=True):
-        st.session_state.current_step = 55
-        st.rerun()
-    if j4.button("Hr 0: Start", use_container_width=True):
-        st.session_state.current_step = 0
-        st.rerun()
+    j3.button("Hr 55: Multi-Risk", use_container_width=True, on_click=_set_step, args=(55,))
+    j4.button("Hr 0: Start", use_container_width=True, on_click=_set_step, args=(0,))
 
     st.divider()
     st.subheader("🔧 Resource Scarcity Controls")
@@ -170,11 +171,7 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-    if st.button("🔄 Reset Entire Demo", type="primary", use_container_width=True):
-        client.reset()
-        st.session_state.current_step = 35
-        st.session_state.flash_msg = ("success", "Demo reset cleanly! Ready for next pitch.")
-        st.rerun()
+    st.button("🔄 Reset Entire Demo", type="primary", use_container_width=True, on_click=_reset_demo)
 
 # ---------------- Fetch Live Unified Twin State ----------------
 
