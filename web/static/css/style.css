@@ -410,6 +410,24 @@ body.simple-mode .engineer-only {
     flex-wrap: wrap;
 }
 
+@media (max-width: 900px) {
+    .topbar-inner {
+        align-items: flex-start;
+    }
+
+    .seg-nav {
+        order: 3;
+        width: 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 2px;
+    }
+
+    .topbar-actions {
+        margin-left: auto;
+    }
+}
+
 .theme-select {
     background: var(--bg-elevated);
     border: 1px solid var(--border-subtle);

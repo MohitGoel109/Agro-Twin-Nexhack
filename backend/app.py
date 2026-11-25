@@ -12,6 +12,7 @@ Or:
 import os
 import sys
 from typing import Dict, Optional
+from urllib.parse import urlsplit
 
 # Ensure repo root is on sys.path even if executed directly as `python backend/app.py`
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +25,18 @@ from pydantic import BaseModel, Field
 
 from backend.state import TwinStateManager
 
+CORS_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("AGRO_TWIN_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if "*" in CORS_ORIGINS:
+    raise ValueError("AGRO_TWIN_CORS_ORIGINS must contain explicit origins, not '*'.")
+for origin in CORS_ORIGINS:
+    parsed_origin = urlsplit(origin)
+    if parsed_origin.scheme not in ("http", "https") or not parsed_origin.netloc or parsed_origin.path:
+        raise ValueError("Each AGRO_TWIN_CORS_ORIGINS entry must be an HTTP(S) origin without a path.")
+
 app = FastAPI(
     title="Agro-Twin Predictive Maintenance API",
     description=(
@@ -34,13 +47,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow Streamlit, React, or Render-hosted frontends to connect seamlessly
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Single live Twin State Manager shared across API requests

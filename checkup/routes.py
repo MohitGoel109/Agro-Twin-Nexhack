@@ -73,6 +73,30 @@ def create_blueprint(twin):
                             headers={"Content-Disposition": "attachment; filename=machine-health-report-%s.pdf" % _html.escape(machine_id)})
         return Response(render_html(rep), mimetype="text/html")
 
+    @bp.route("/api/checkup/bulk-report")
+    def bulk_report():
+        from ml import bulk_predict
+        rep = bulk_predict.report()
+        if rep is None:
+            return jsonify({"ok": False, "error": "Bulk model report not found. Run: python ml/train_bulk.py"}), 404
+        return jsonify({"ok": True, "label": "Trained on %d simulated machines (Synthetic data)" % rep["n_train_machines"], "report": rep,
+                        "benchmark": bulk_predict.benchmark()})
+
+    @bp.route("/api/checkup/<machine_id>/bulk-risk")
+    def bulk_risk(machine_id):
+        from checkup import store
+        from ml import bulk_predict
+        m = service.find_machine(twin, machine_id)
+        if m is None:
+            return jsonify({"ok": False, "error": "Unknown machine"}), 404
+        rec = store.get(machine_id)
+        if rec is None:
+            return jsonify({"ok": False, "error": "Submit the check-up first"}), 404
+        out = bulk_predict.predict(m["type"], rec["owner"], rec["answers"], m.get("raw_sensors"))
+        if out is None:
+            return jsonify({"ok": False, "error": "Bulk model not available"}), 404
+        return jsonify({"ok": True, "ideal_vs_current": rec["result"]["ideal_vs_current"], **out})
+
     @bp.after_app_request
     def add_farmer_info_to_fleet(response):
         """Adds farmer check-up fields and priority-queue entries to GET /api/fleet. Baseline numbers are untouched."""

@@ -10,7 +10,24 @@ def test_checkup_page_and_assets():
     assert r.status_code == 200 and b"Farmer Check-up" in r.data
     assert c.get("/static/js/checkup.js").status_code == 200
     assert c.get("/static/css/checkup.css").status_code == 200
-    assert b"/checkup" in c.get("/").data
+    home = c.get("/").data
+    assert b"/checkup" in home
+    assert b"<<<<<<<" not in home and b">>>>>>>" not in home
+    assert home.count(b'id="btn-open-ai"') == 0
+
+
+def test_segmented_dashboard_routes():
+    c = app.test_client()
+    pages = {
+        "/machines": b"Your Farm Machines",
+        "/picture": b"Machine Picture",
+        "/savings": b"Money Saved",
+        "/repairs": b"Repairs",
+    }
+    for path, marker in pages.items():
+        response = c.get(path)
+        assert response.status_code == 200
+        assert marker in response.data
 
 
 def test_submit_then_machines_list_shows_urgency():
