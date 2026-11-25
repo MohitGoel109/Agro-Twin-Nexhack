@@ -11,6 +11,8 @@
             loadedEarlier: "We loaded your earlier answers. You can change them.",
             sensorRisk: "Sensor risk", symptomRisk: "Your answers", combined: "Combined risk",
             suspected: "Suspected parts", why: "What we found", ideal: "Placeholder service intervals vs current", none: "Nothing specific found",
+            bulkUnavailable: "Synthetic model report is unavailable; the rule-based check-up still works.",
+            bulkRiskUnavailable: "The model-based estimate is unavailable; the rule-based result above is unchanged.",
             action: "What to do", editAns: "Edit my answers", report: "Get my report", reportHi: "रिपोर्ट हिंदी में", pdf: "Download PDF (English)", wa: "Share on WhatsApp",
             reqService: "Request service", requested: "Service requested.", saved: "Saved.",
             needsRepair: "This machine needs repair", loading: "Loading...", failed: "Something went wrong. Please try again.",
@@ -32,7 +34,9 @@
             ownerTitle: "आपकी मशीन के बारे में", step: "चरण", of: "/", optional: "अपनी या किराये की चुनें; फ़ील्ड उसी अनुसार बदलेंगे। जो पता न हो उसे छोड़ दें।",
             loadedEarlier: "आपके पिछले जवाब लोड हो गए हैं। आप उन्हें बदल सकते हैं।",
             sensorRisk: "सेंसर जोखिम", symptomRisk: "आपके जवाब", combined: "कुल जोखिम",
-            suspected: "संभावित खराब पुर्जे", why: "हमें क्या मिला", ideal: "नमूना सर्विस अंतराल बनाम वर्तमान", none: "कुछ खास नहीं मिला",
+            suspected: "संभावित खराब पुर्जे", why: "हमें क्या मिला", ideal: "नमूना सर्विस अंतराल बनाम मौजूदा", none: "कुछ खास नहीं मिला",
+            bulkUnavailable: "सिम्युलेटेड मॉडल रिपोर्ट उपलब्ध नहीं है; नियम-आधारित चेक-अप फिर भी काम करता है।",
+            bulkRiskUnavailable: "मॉडल-आधारित अनुमान उपलब्ध नहीं है; ऊपर का नियम-आधारित नतीजा अपरिवर्तित है।",
             action: "क्या करें", editAns: "जवाब बदलें", report: "मेरी रिपोर्ट", reportHi: "रिपोर्ट हिंदी में", pdf: "PDF डाउनलोड (अंग्रेज़ी)", wa: "व्हाट्सऐप पर भेजें",
             reqService: "सर्विस का अनुरोध करें", requested: "सर्विस का अनुरोध हो गया।", saved: "सेव हो गया।",
             needsRepair: "इस मशीन की मरम्मत ज़रूरी है", loading: "लोड हो रहा है...", failed: "कुछ गड़बड़ हुई। दोबारा कोशिश करें।",
@@ -51,7 +55,7 @@
     var ICON = { sound: "🔊", smell: "👃", look: "👀", feel: "✋", trend: "⏱", owner: "📋" };
     var ICON_URG = { OK: "✅", WATCH: "👁", SERVICE_SOON: "⚠️", STOP_NOW: "⛔" };
 
-    var S = { lang: "en", data: null, machines: [], machine: null, owner: {}, answers: {}, step: 0, steps: [], result: null, loaded: false };
+    var S = { bulk: null, bulkRisk: null, bulkError: false, bulkRiskError: false, lang: "en", data: null, machines: [], machine: null, owner: {}, answers: {}, step: 0, steps: [], result: null, loaded: false };
 
     function el(tag, cls, text) {
         var e = document.createElement(tag);
@@ -156,7 +160,11 @@
             if (j.ok) { S.owner = j.owner || {}; S.answers = j.answers || {}; S.loaded = true; }
             else if (draft) { S.owner = draft.owner || {}; S.answers = draft.answers || {}; S.loaded = true; }
             render();
-        }).catch(function () { render(); showError(t("failed")); });
+        }).catch(function (error) {
+            render();
+            showError(t("failed"));
+            console.warn("Could not load farmer check-up profile.", error);
+        });
     }
 
     function renderOwner(stage) {
@@ -337,7 +345,37 @@
         b5.addEventListener("click", function () { S.result = null; S.machine = null; S.step = 0; loadMachines().then(render); });
         btns.appendChild(b5);
         stage.appendChild(btns);
+        renderBulk(stage);
         stage.appendChild(el("p", "ck-note", t("note")));
+    }
+
+    function renderBulk(stage) {
+        var box = el("div", "ck-bulk");
+        if (S.bulk && S.bulk.report) {
+            var r = S.bulk.report;
+            box.appendChild(el("h2", "ck-h", pick("Trained on simulated machines", "सिम्युलेटेड मशीनों पर प्रशिक्षित")));
+            box.appendChild(el("p", "ck-tag", pick("Trained on ", "प्रशिक्षण: ") + r.n_train_machines + pick(" simulated machines · Synthetic data", " सिम्युलेटेड मशीनें · कृत्रिम डेटा")));
+            box.appendChild(el("p", "ck-info", pick("Held-out test: ", "अलग टेस्ट: ") + r.n_test_machines + pick(" machines never seen in training. Accuracy ", " मशीनें। सटीकता ") +
+                Math.round(r.accuracy * 100) + "% (" + pick("fixed-interval rule: ", "तय अंतराल नियम: ") + Math.round(r.baseline_fixed_interval.accuracy * 100) + "%). " +
+                pick("Hours-to-failure error: ", "खराबी तक घंटों की त्रुटि: ") + r.hours_to_failure_mae.all_test_machines + " h. " +
+                pick("This shows the method works on our simulation, not that it is accurate on real tractors.", "यह हमारे सिमुलेशन पर तरीका काम करता दिखाता है, असली ट्रैक्टरों पर सटीकता नहीं।")));
+        }
+        if (S.bulkError) box.appendChild(el("p", "ck-info", t("bulkUnavailable")));
+        if (S.bulk && S.bulk.benchmark) {
+            var bm = S.bulk.benchmark, a = bm.any_failure, bl = bm.baseline_tool_wear_over_200_min;
+            box.appendChild(el("p", "ck-tag", pick("Public benchmark: different machine type", "सार्वजनिक बेंचमार्क: अलग प्रकार की मशीन")));
+            box.appendChild(el("p", "ck-info", pick("On the public UCI AI4I dataset (", "सार्वजनिक UCI AI4I डेटा पर (") + bm.rows + pick(" milling-machine records, itself synthetic) the same method scored F1 ", " मिलिंग मशीन रिकॉर्ड, खुद कृत्रिम) वही तरीका F1 ") + a.f1 +
+                " (" + pick("simple rule: ", "सरल नियम: ") + bl.f1 + "). " +
+                pick("This shows the method works on a public benchmark, not that it works on tractors.", "यह दिखाता है कि तरीका सार्वजनिक बेंचमार्क पर काम करता है, ट्रैक्टरों पर नहीं।")));
+        }
+        if (S.bulkRisk) {
+            var b = S.bulkRisk;
+            var top = b.top_system && S.data.systems[b.top_system] ? pick(S.data.systems[b.top_system].en, S.data.systems[b.top_system].hi) : "-";
+            box.appendChild(el("p", "ck-info", pick("Learned model (simulated data): chance of a fault ", "सीखा मॉडल (सिम्युलेटेड डेटा): खराबी की संभावना ") + Math.round(b.p_any_fault * 100) + "%, " +
+                pick("most likely part: ", "सबसे संभावित हिस्सा: ") + top + ", " + pick("estimated time to failure: ", "खराबी तक अनुमानित समय: ") + b.hours_to_failure_range[0] + "-" + b.hours_to_failure_range[1] + " h."));
+        }
+        if (S.bulkRiskError) box.appendChild(el("p", "ck-info", t("bulkRiskUnavailable")));
+        stage.appendChild(box);
     }
 
     function submit() {
@@ -349,7 +387,17 @@
         }).then(function (j) {
             next.disabled = false;
             if (!j.ok) { showError((j.errors && j.errors.join("; ")) || j.error || t("failed")); return; }
-            S.result = j.result; render(); window.scrollTo(0, 0);
+            S.result = j.result; S.bulkRisk = null; S.bulkRiskError = false;
+            api("/api/checkup/" + encodeURIComponent(S.machine) + "/bulk-risk").then(function (b) {
+                if (b.ok) S.bulkRisk = b;
+                else { S.bulkRiskError = true; console.warn("Bulk risk estimate unavailable:", b.error || b.__status); }
+                render();
+            }).catch(function (error) {
+                S.bulkRiskError = true;
+                console.warn("Bulk risk request failed.", error);
+                render();
+            });
+            render(); window.scrollTo(0, 0);
         }).catch(function () { next.disabled = false; showError(t("failed")); });
     }
 
@@ -369,6 +417,15 @@
             S.step++; saveDraft(); render(); window.scrollTo(0, 0);
         });
         var savedLang = store("agro-checkup-lang"); if (savedLang === "hi") S.lang = "hi";
+        api("/api/checkup/bulk-report").then(function (b) {
+            if (b.ok) S.bulk = b;
+            else { S.bulkError = true; console.warn("Bulk model report unavailable:", b.error || b.__status); }
+            if (S.result) render();
+        }).catch(function (error) {
+            S.bulkError = true;
+            console.warn("Bulk model report request failed.", error);
+            if (S.result) render();
+        });
         Promise.all([api("/api/checkup/questions"), loadMachines()]).then(function (res) {
             S.data = res[0]; buildSteps(); render();
         }).catch(function () { showError(t("failed")); });

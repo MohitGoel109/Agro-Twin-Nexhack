@@ -1,0 +1,108 @@
+{
+  "dataset": "UCI AI4I 2020 Predictive Maintenance (milling machines; itself synthetic)",
+  "honest_label": "DIFFERENT MACHINE TYPE and synthetic. Shows the method works on a public benchmark, NOT that it works on tractors.",
+  "rows": 10000,
+  "failures": 339,
+  "failure_rate": 0.0339,
+  "split": "70% train / 30% test, stratified, seed 42. Each row is a different machine, so no machine appears in both. Decision threshold chosen by 5-fold CV on train only.",
+  "features_note": "Raw sensors plus temperature difference, mechanical power and torque x wear. These engineered features follow the physics the dataset was generated from.",
+  "any_failure": {
+    "support_test": 102,
+    "threshold": 0.47,
+    "precision": 0.944,
+    "recall": 0.833,
+    "f1": 0.885,
+    "roc_auc": 0.985,
+    "brier": 0.0074,
+    "brier_base_rate": 0.0328
+  },
+  "baseline_tool_wear_over_200_min": {
+    "precision": 0.146,
+    "recall": 0.343,
+    "f1": 0.205
+  },
+  "per_failure_type": {
+    "TWF": {
+      "meaning": "tool wear failure",
+      "support_test": 13,
+      "threshold": 0.07,
+      "precision": 0.046,
+      "recall": 0.231,
+      "f1": 0.077,
+      "roc_auc": 0.959,
+      "brier": 0.0043,
+      "brier_base_rate": 0.0043
+    },
+    "HDF": {
+      "meaning": "heat dissipation failure",
+      "support_test": 42,
+      "threshold": 0.45,
+      "precision": 0.946,
+      "recall": 0.833,
+      "f1": 0.886,
+      "roc_auc": 1.0,
+      "brier": 0.002,
+      "brier_base_rate": 0.0138
+    },
+    "PWF": {
+      "meaning": "power failure",
+      "support_test": 23,
+      "threshold": 0.65,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "roc_auc": 1.0,
+      "brier": 0.0004,
+      "brier_base_rate": 0.0076
+    },
+    "OSF": {
+      "meaning": "overstrain failure",
+      "support_test": 27,
+      "threshold": 0.55,
+      "precision": 1.0,
+      "recall": 0.963,
+      "f1": 0.981,
+      "roc_auc": 1.0,
+      "brier": 0.0008,
+      "brier_base_rate": 0.0089
+    },
+    "RNF": {
+      "meaning": "random failure (unpredictable by design)",
+      "support_test": 6,
+      "threshold": 0.05,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "roc_auc": 0.547,
+      "brier": 0.002,
+      "brier_base_rate": 0.002
+    }
+  },
+  "top_features": [
+    {
+      "feature": "strain",
+      "importance": 0.231
+    },
+    {
+      "feature": "power_w",
+      "importance": 0.207
+    },
+    {
+      "feature": "rpm",
+      "importance": 0.157
+    },
+    {
+      "feature": "torque",
+      "importance": 0.141
+    },
+    {
+      "feature": "temp_diff",
+      "importance": 0.119
+    }
+  ],
+  "not_tested": [
+    "No owner-form fields or farmer symptoms in this dataset (check-up not tested).",
+    "No time-to-failure column (no hours-left prediction).",
+    "Random failures (RNF) are noise by design and are reported, not hidden."
+  ]
+}

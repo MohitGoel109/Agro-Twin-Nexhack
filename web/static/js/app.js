@@ -1458,7 +1458,7 @@ function initAssistantDrawer() {
     }
 
     fab.addEventListener("click", openDrawer);
-    openTop.addEventListener("click", openDrawer);
+    if (openTop) openTop.addEventListener("click", openDrawer);
     closeBtn.addEventListener("click", closeDrawer);
 
     autoBtn.addEventListener("click", () => {

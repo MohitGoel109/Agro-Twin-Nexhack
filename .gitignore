@@ -7,3 +7,6 @@ venv/
 .DS_Store
 .vscode/
 *.log
+data/bulk_fleet.csv
+data/bulk_fleet.parquet
+data/ai4i2020.csv
