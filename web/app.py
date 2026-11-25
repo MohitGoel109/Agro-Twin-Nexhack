@@ -216,10 +216,43 @@ def _machine_operation(operation: str, **kwargs) -> dict:
 
 # ---------------- Main Page ----------------
 
+PAGE_ROUTES = {
+    "home": ("/", "Agro-Twin — Easy Farm Machine Helper"),
+    "machines": ("/machines", "Agro-Twin — Your Farm Machines"),
+    "picture": ("/picture", "Agro-Twin — Machine Picture & Parts"),
+    "savings": ("/savings", "Agro-Twin — Money Saved (₹)"),
+    "repairs": ("/repairs", "Agro-Twin — Repairs & Mechanic SMS"),
+}
+
+
 @app.route("/")
 def index():
-    """Serves the segmented, animated Agro-Twin Flask web application."""
-    return render_template("index.html")
+    """Serves the Home overview page."""
+    return render_template("index.html", active_page="home", page_title=PAGE_ROUTES["home"][1])
+
+
+@app.route("/machines")
+def page_machines():
+    """Serves the dedicated Farm Machines status & booking page."""
+    return render_template("index.html", active_page="machines", page_title=PAGE_ROUTES["machines"][1])
+
+
+@app.route("/picture")
+def page_picture():
+    """Serves the dedicated Interactive Machine Picture (X-Ray) & Sensors page."""
+    return render_template("index.html", active_page="picture", page_title=PAGE_ROUTES["picture"][1])
+
+
+@app.route("/savings")
+def page_savings():
+    """Serves the dedicated Money Saved (₹) ROI & Comparison page."""
+    return render_template("index.html", active_page="savings", page_title=PAGE_ROUTES["savings"][1])
+
+
+@app.route("/repairs")
+def page_repairs():
+    """Serves the dedicated Booked Repairs, SMS Cards & Fleet Manager page."""
+    return render_template("index.html", active_page="repairs", page_title=PAGE_ROUTES["repairs"][1])
 
 
 # ---------------- Digital Twin REST Endpoints ----------------
