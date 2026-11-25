@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Farmer Check-up — Agro-Twin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/checkup.css') }}" />
+</head>
+<body class="ck-body">
+    <header class="ck-top">
+        <a class="ck-back" href="/">&larr; <span data-t="back">Back to dashboard</span></a>
+        <button id="ck-lang" class="btn btn-subtle" type="button">EN / हिंदी</button>
+    </header>
+
+    <main class="ck-shell">
+        <h1 data-t="title">Farmer Check-up</h1>
+        <p class="ck-note" data-t="note">Based on common mechanical rules of thumb, not a replacement for a mechanic. Stays on this demo. No personal data needed.</p>
+
+        <div class="ck-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="ck-bar" class="ck-bar"></div>
+        </div>
+        <p id="ck-step-label" class="ck-step-label"></p>
+
+        <section id="ck-stage" aria-live="polite"></section>
+
+        <div id="ck-nav" class="ck-nav">
+            <button id="ck-prev" class="btn btn-subtle ck-big" type="button" data-t="prev">Back</button>
+            <button id="ck-next" class="btn btn-amber ck-big" type="button" data-t="next">Next</button>
+        </div>
+        <p id="ck-error" class="ck-error hidden" role="alert"></p>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/checkup.js') }}"></script>
+</body>
+</html>

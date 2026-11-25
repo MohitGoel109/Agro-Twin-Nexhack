@@ -41,6 +41,8 @@ app = Flask(
 twin = TwinStateManager(num_steps=120, technicians_total=2)
 twin.current_step = 35
 assistant = AgroTwinAssistant(twin)
+from checkup.routes import create_blueprint as create_checkup_blueprint  # noqa: E402
+app.register_blueprint(create_checkup_blueprint(twin))
 
 # Fallback state used only if backend/state.py hasn't pulled Member 3's latest update yet
 _fallback_weather = {"weather_mode": "normal", "ambient_temp_c": 30}

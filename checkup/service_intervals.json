@@ -1,0 +1,33 @@
+{
+  "_note": "ASSUMPTION: placeholder values. Replace with the figures in the machine's own service manual before relying on them.",
+  "Tractor": {
+    "engine":     {"item_en": "Engine oil and filter", "item_hi": "इंजन ऑयल और फ़िल्टर", "hours": 250},
+    "cooling":    {"item_en": "Coolant and radiator check", "item_hi": "कूलेंट और रेडिएटर जांच", "hours": 1000},
+    "brakes":     {"item_en": "Brake check", "item_hi": "ब्रेक जांच", "hours": 500},
+    "hydraulics": {"item_en": "Hydraulic oil and filter", "item_hi": "हाइड्रोलिक ऑयल और फ़िल्टर", "hours": 1000},
+    "drivetrain": {"item_en": "Gearbox oil and clutch check", "item_hi": "गियरबॉक्स ऑयल और क्लच जांच", "hours": 1000},
+    "fuel":       {"item_en": "Fuel filter", "item_hi": "फ्यूल फ़िल्टर", "hours": 500},
+    "electrical": {"item_en": "Battery and wiring (check each season)", "item_hi": "बैटरी और तार (हर सीज़न जांचें)", "hours": null},
+    "tyres":      {"item_en": "Tyre pressure and condition (check each season)", "item_hi": "टायर प्रेशर और हालत (हर सीज़न जांचें)", "hours": null}
+  },
+  "Harvester": {
+    "engine":     {"item_en": "Engine oil and filter", "item_hi": "इंजन ऑयल और फ़िल्टर", "hours": 250},
+    "cooling":    {"item_en": "Coolant and radiator check", "item_hi": "कूलेंट और रेडिएटर जांच", "hours": 500},
+    "brakes":     {"item_en": "Brake check", "item_hi": "ब्रेक जांच", "hours": 500},
+    "hydraulics": {"item_en": "Hydraulic oil and filter", "item_hi": "हाइड्रोलिक ऑयल और फ़िल्टर", "hours": 800},
+    "drivetrain": {"item_en": "Gearbox, belts and bearings", "item_hi": "गियरबॉक्स, बेल्ट और बेयरिंग", "hours": 500},
+    "fuel":       {"item_en": "Fuel filter", "item_hi": "फ्यूल फ़िल्टर", "hours": 500},
+    "electrical": {"item_en": "Battery and wiring (check each season)", "item_hi": "बैटरी और तार (हर सीज़न जांचें)", "hours": null},
+    "tyres":      {"item_en": "Tyre pressure and condition (check each season)", "item_hi": "टायर प्रेशर और हालत (हर सीज़न जांचें)", "hours": null}
+  },
+  "Seeder": {
+    "engine":     {"item_en": "Engine oil and filter", "item_hi": "इंजन ऑयल और फ़िल्टर", "hours": 250},
+    "cooling":    {"item_en": "Coolant and radiator check", "item_hi": "कूलेंट और रेडिएटर जांच", "hours": 1000},
+    "brakes":     {"item_en": "Brake check", "item_hi": "ब्रेक जांच", "hours": 500},
+    "hydraulics": {"item_en": "Hydraulic oil and filter", "item_hi": "हाइड्रोलिक ऑयल और फ़िल्टर", "hours": 1000},
+    "drivetrain": {"item_en": "Gearbox, chain and bearings", "item_hi": "गियरबॉक्स, चेन और बेयरिंग", "hours": 500},
+    "fuel":       {"item_en": "Fuel filter", "item_hi": "फ्यूल फ़िल्टर", "hours": 500},
+    "electrical": {"item_en": "Battery and wiring (check each season)", "item_hi": "बैटरी और तार (हर सीज़न जांचें)", "hours": null},
+    "tyres":      {"item_en": "Tyre pressure and condition (check each season)", "item_hi": "टायर प्रेशर और हालत (हर सीज़न जांचें)", "hours": null}
+  }
+}

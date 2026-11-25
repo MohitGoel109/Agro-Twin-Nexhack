@@ -12,6 +12,7 @@
     />
     <script src="https://cdn.plot.ly/plotly-2.35.0.min.js" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/checkup.css') }}" />
 </head>
 <body>
     <!-- Calm topographic field contour background (never flashy) -->
@@ -45,6 +46,7 @@
                 <button id="btn-lang" class="btn btn-subtle" title="Switch English / Hindi">EN / हिंदी</button>
                 <button id="btn-speak" class="btn btn-ghost" title="Read top priority alert aloud">Speak Alert</button>
                 <button id="btn-toggle-bg" class="btn btn-ghost" title="Toggle calm background motion">Motion: On</button>
+                <a id="btn-checkup" class="btn btn-amber" href="/checkup">Farmer Check-up</a>
                 <button id="btn-open-ai" class="btn btn-amber" data-i18n="askGuide">Ask AI Guide</button>
             </div>
         </div>
@@ -605,5 +607,6 @@
     </aside>
 
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/checkup_chip.js') }}" defer></script>
 </body>
 </html>

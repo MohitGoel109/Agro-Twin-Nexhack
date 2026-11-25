@@ -45,6 +45,8 @@ app.add_middleware(
 
 # Single live Twin State Manager shared across API requests
 twin = TwinStateManager(num_steps=120, technicians_total=2)
+from checkup.fastapi_router import create_router as create_checkup_router  # noqa: E402
+app.include_router(create_checkup_router(twin))
 
 
 # ---------------- Request Schemas ----------------
